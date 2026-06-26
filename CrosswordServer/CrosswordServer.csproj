@@ -11,3 +11,6 @@
   </ItemGroup>
 
 </Project>
+<Target Name="PostBuild" AfterTargets="Build">
+  <Exec Command="dotnet publish -c Release -o ..\NumericCrossword\Server" />
+</Target>

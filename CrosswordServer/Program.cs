@@ -1,46 +1,47 @@
-using CrosswordServer.Storage;
-using CrosswordServer.Models;
+using CrosswordServer.Storage;   // подключаем наше хранилище игр
+using CrosswordServer.Models;    // подключаем модели JSON-запросов
 
 var builder = WebApplication.CreateBuilder(args);
 var app = builder.Build();
 
 // создаём одно хранилище игр на весь сервер
+// оно живёт всё время, пока работает приложение
 var storage = new GameStorage();
 
-// 1) Получить список всех игр
 
+// =============================================================
+// 1) Получить список всех игр
+// =============================================================
 app.MapGet("/games", () =>
 {
-    // Берём все активные игры
+    // получаем все активные игры из хранилища
     var games = storage.GetAllGames();
 
-    // Преобразуем в удобный формат для клиента
-    var result = games.Select
-    (
-        g => new
-        {
-            gameId = g.GameId,
-            creator = g.CreatorName,
-            players = g.Players.Select(p => p.PlayerName).ToList(),
-            status = g.Status.ToString()
-        }
-    );
+    // преобразуем игры в удобный JSON-формат
+    var result = games.Select(g => new
+    {
+        gameId = g.GameId,
+        creator = g.CreatorName,
+        players = g.Players.Select(p => p.PlayerName).ToList(),
+        status = g.Status.ToString(),
+        difficulty = g.Difficulty
+    });
 
+    // отправляем клиенту JSON
     return Results.Ok(result);
 });
 
-app.Run();
 
-// 2) Создать игру
-
-app.MapPost("/game/create", (string creatorName, string difficulty) =>
+// =============================================================
+// 2) Создать игру (принимаем JSON)
+// =============================================================
+app.MapPost("/game/create", (CreateGameRequest req) =>
 {
     // создаём игру в хранилище
-    var game = storage.CreateGame(creatorName, difficulty);
+    var game = storage.CreateGame(req.CreatorName, req.Difficulty);
 
     // отправляем клиенту только нужные данные
-    return Results.Ok
-    (new
+    return Results.Ok(new
     {
         gameId = game.GameId,
         seed = game.Seed,
@@ -50,20 +51,24 @@ app.MapPost("/game/create", (string creatorName, string difficulty) =>
     });
 });
 
-// 3) Подключиться к игре
 
-app.MapPost("/game/join", (string gameId, string playerName) =>
+// =============================================================
+// 3) Подключиться к игре (принимаем JSON)
+// =============================================================
+app.MapPost("/game/join", (JoinGameRequest req) =>
 {
     // пытаемся подключить игрока
-    bool ok = storage.JoinGame(gameId, playerName);
+    // метод возвращает true/false
+    var ok = storage.JoinGame(req.GameId, req.PlayerName);
 
+    // если игра не найдена — возвращаем 404
     if (!ok)
         return Results.NotFound("Игра не найдена");
 
-    // получаем игру после подключения
-    var g = storage.GetGame(gameId);
+    // получаем обновлённую игру
+    var g = storage.GetGame(req.GameId);
 
-    // отправляем клиенту обновлённую информацию об игре
+    // отправляем клиенту обновлённую информацию
     return Results.Ok(new
     {
         gameId = g.GameId,
@@ -74,30 +79,33 @@ app.MapPost("/game/join", (string gameId, string playerName) =>
     });
 });
 
-// 4) Отправить результат игрока
 
-app.MapPost("/game/result", (string gameId, string playerName, int score, int time) =>
+// =============================================================
+// 4) Отправить результат игрока (принимаем JSON)
+// =============================================================
+app.MapPost("/game/result", (ResultRequest req) =>
 {
-    // пытаемся сохранить результат
-    bool ok = storage.SubmitResult(gameId, playerName, score, time);
+    // сохраняем результат игрока
+    // метод возвращает true/false
+    var ok = storage.SubmitResult(req.GameId, req.PlayerName, req.Score, req.Time);
 
+    // если игра или игрок не найдены
     if (!ok)
         return Results.NotFound("Игра не найдена или игрок отсутствует");
 
-    // после SubmitResult игра может быть удалена
-    // проверяем, осталась ли она в хранилище
-    var g = storage.GetGame(gameId);
+    // после SubmitResult игра может быть удалена (если все игроки закончили)
+    var g = storage.GetGame(req.GameId);
 
+    // если игра удалена — сообщаем клиенту
     if (g == null)
     {
-        // игра завершена и удалена
         return Results.Ok(new
         {
             deleted = true
         });
     }
 
-    // игра ещё не завершена
+    // игра ещё существует — отправляем список игроков и их результаты
     return Results.Ok(new
     {
         deleted = false,
@@ -110,3 +118,6 @@ app.MapPost("/game/result", (string gameId, string playerName, int score, int ti
     });
 });
 
+
+// запускаем сервер
+app.Run();
