@@ -34,7 +34,7 @@ namespace CrosswordServer.Models
 
         /// Сид для генерации кроссворда – чтобы у всех был одинаковый вариант.
         public int Seed { get; set; }
-
+        //public List<Formula> Formulas { get; set; } = new(); // <-- Хранить готовые формулы
         /// Сложность (если нужна: "Лёгкая", "Средняя", "Сложная").
         /// Можно оставить пустой строкой, если пока не используем.
         public string Difficulty { get; set; } = string.Empty;
@@ -48,5 +48,6 @@ namespace CrosswordServer.Models
         /// Время создания игры – пригодится, если потом захотим
         /// удалять старые игры или сортировать список.
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime StartTime { get; set; }
     }
 }

@@ -29,14 +29,14 @@ namespace CrosswordServer.Storage
                 CreatorName = creatorName,
                 Difficulty = difficulty,
                 Seed = seed,
-                Status = GameStatus.Waiting
+                Status = GameStatus.Waiting,
             };
-
             // Создатель автоматически становится первым игроком.
             game.Players.Add(new GamePlayer
             {
                 PlayerName = creatorName
             });
+            game.StartTime = DateTime.UtcNow;
 
             _games[id] = game;
             return game;
