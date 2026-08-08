@@ -1,105 +1,90 @@
-using CrosswordServer.Storage;   // подключаем наше хранилище игр (класс GameStorage)
-using CrosswordServer.Models;    // подключаем модели JSON-запросов (CreateGameRequest, JoinGameRequest и т.д.)
+п»їusing CrosswordServer.Storage;   // РїРѕРґРєР»СЋС‡Р°РµРј РЅР°С€Рµ С…СЂР°РЅРёР»РёС‰Рµ РёРіСЂ (РєР»Р°СЃСЃ GameStorage)
+using CrosswordServer.Models;    // РїРѕРґРєР»СЋС‡Р°РµРј РјРѕРґРµР»Рё JSON-Р·Р°РїСЂРѕСЃРѕРІ (CreateGameRequest, JoinGameRequest Рё С‚.Рґ.)
 
-// =============================================================
-// Создаём объект конфигурации и DI-контейнер
-// =============================================================
+// РЎРѕР·РґР°С‘Рј РѕР±СЉРµРєС‚ РєРѕРЅС„РёРіСѓСЂР°С†РёРё Рё DI-РєРѕРЅС‚РµР№РЅРµСЂ
 var builder = WebApplication.CreateBuilder(args);
 
-// Добавляем поддержку Swagger — это инструмент для тестирования API
-builder.Services.AddEndpointsApiExplorer();   // позволяет Swagger видеть наши endpoints
-builder.Services.AddSwaggerGen();             // генерирует UI и документацию
+// Р”РѕР±Р°РІР»СЏРµРј РїРѕРґРґРµСЂР¶РєСѓ Swagger вЂ” СЌС‚Рѕ РёРЅСЃС‚СЂСѓРјРµРЅС‚ РґР»СЏ С‚РµСЃС‚РёСЂРѕРІР°РЅРёСЏ API
+builder.Services.AddEndpointsApiExplorer();   // РїРѕР·РІРѕР»СЏРµС‚ Swagger РІРёРґРµС‚СЊ РЅР°С€Рё endpoints
+builder.Services.AddSwaggerGen();             // РіРµРЅРµСЂРёСЂСѓРµС‚ UI Рё РґРѕРєСѓРјРµРЅС‚Р°С†РёСЋ
 
-// Добавляем поддержку контроллеров (на будущее, если будем расширять API)
+// Р”РѕР±Р°РІР»СЏРµРј РїРѕРґРґРµСЂР¶РєСѓ РєРѕРЅС‚СЂРѕР»Р»РµСЂРѕРІ (РЅР° Р±СѓРґСѓС‰РµРµ, РµСЃР»Рё Р±СѓРґРµРј СЂР°СЃС€РёСЂСЏС‚СЊ API)
 builder.Services.AddControllers();
 
-// =============================================================
-// Создаём приложение
-// =============================================================
+// РЎРѕР·РґР°С‘Рј РїСЂРёР»РѕР¶РµРЅРёРµ
 var app = builder.Build();
 
-// =============================================================
-// Включаем Swagger только в режиме разработки
-// (в продакшене можно отключить)
-// =============================================================
+// Р’РєР»СЋС‡Р°РµРј Swagger С‚РѕР»СЊРєРѕ РІ СЂРµР¶РёРјРµ СЂР°Р·СЂР°Р±РѕС‚РєРё
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();        // включает генерацию swagger.json
-    app.UseSwaggerUI();      // включает красивый UI по адресу /swagger
+    app.UseSwagger();        // РІРєР»СЋС‡Р°РµС‚ РіРµРЅРµСЂР°С†РёСЋ swagger.json
+    app.UseSwaggerUI();      // РІРєР»СЋС‡Р°РµС‚ РєСЂР°СЃРёРІС‹Р№ UI РїРѕ Р°РґСЂРµСЃСѓ /swagger
 }
 
-// =============================================================
-// Создаём одно хранилище игр на весь сервер
-// Оно живёт всё время, пока работает приложение
-// =============================================================
+// РЎРѕР·РґР°С‘Рј РѕРґРЅРѕ С…СЂР°РЅРёР»РёС‰Рµ РёРіСЂ РЅР° РІРµСЃСЊ СЃРµСЂРІРµСЂ
+// РћРЅРѕ Р¶РёРІС‘С‚ РІСЃС‘ РІСЂРµРјСЏ, РїРѕРєР° СЂР°Р±РѕС‚Р°РµС‚ РїСЂРёР»РѕР¶РµРЅРёРµ
 var storage = new GameStorage();
 
-
-// =============================================================
-// 1) Получить список всех игр
+// 1) РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РІСЃРµС… РёРіСЂ
 // GET /games
-// =============================================================
+
 app.MapGet("/games", () =>
 {
-    // получаем все активные игры из хранилища
+    // РїРѕР»СѓС‡Р°РµРј РІСЃРµ Р°РєС‚РёРІРЅС‹Рµ РёРіСЂС‹ РёР· С…СЂР°РЅРёР»РёС‰Р°
     var games = storage.GetAllGames();
 
-    // преобразуем игры в удобный JSON-формат
+    // РїСЂРµРѕР±СЂР°Р·СѓРµРј РёРіСЂС‹ РІ СѓРґРѕР±РЅС‹Р№ JSON-С„РѕСЂРјР°С‚
     var result = games.Select(g => new
     {
-        gameId = g.GameId,                               // уникальный ID игры
-        creator = g.CreatorName,                         // имя создателя
-        players = g.Players.Select(p => p.PlayerName),   // список игроков
-        status = g.Status.ToString(),                    // статус игры (Waiting, Playing, Finished)
-        difficulty = g.Difficulty                        // сложность
+        gameId = g.GameId,                               // СѓРЅРёРєР°Р»СЊРЅС‹Р№ ID РёРіСЂС‹
+        creator = g.CreatorName,                         // РёРјСЏ СЃРѕР·РґР°С‚РµР»СЏ
+        players = g.Players.Select(p => p.PlayerName),   // СЃРїРёСЃРѕРє РёРіСЂРѕРєРѕРІ
+        status = g.Status.ToString(),                    // СЃС‚Р°С‚СѓСЃ РёРіСЂС‹ (Waiting, Playing, Finished)
+        difficulty = g.Difficulty                        // СЃР»РѕР¶РЅРѕСЃС‚СЊ
     });
 
-    // отправляем клиенту JSON
+    // РѕС‚РїСЂР°РІР»СЏРµРј РєР»РёРµРЅС‚Сѓ JSON
     return Results.Ok(result);
 });
 
 
-// =============================================================
-// 2) Создать игру
+// 2) РЎРѕР·РґР°С‚СЊ РёРіСЂСѓ
 // POST /game/create
-// Принимаем JSON: { creatorName, difficulty }
-// =============================================================
+// РџСЂРёРЅРёРјР°РµРј JSON: { creatorName, difficulty }
 app.MapPost("/game/create", (CreateGameRequest req) =>
 {
-    // создаём игру в хранилище
+    // СЃРѕР·РґР°С‘Рј РёРіСЂСѓ РІ С…СЂР°РЅРёР»РёС‰Рµ
     var game = storage.CreateGame(req.CreatorName, req.Difficulty);
 
-    // отправляем клиенту только нужные данные
+    // РѕС‚РїСЂР°РІР»СЏРµРј РєР»РёРµРЅС‚Сѓ С‚РѕР»СЊРєРѕ РЅСѓР¶РЅС‹Рµ РґР°РЅРЅС‹Рµ
     return Results.Ok(new
     {
-        gameId = game.GameId,          // ID игры
-        seed = game.Seed,              // seed для генерации кроссворда
-        creator = game.CreatorName,    // имя создателя
-        difficulty = game.Difficulty,  // сложность
+        gameId = game.GameId,          // ID РёРіСЂС‹
+        seed = game.Seed,              // seed РґР»СЏ РіРµРЅРµСЂР°С†РёРё РєСЂРѕСЃСЃРІРѕСЂРґР°
+        creator = game.CreatorName,    // РёРјСЏ СЃРѕР·РґР°С‚РµР»СЏ
+        difficulty = game.Difficulty,  // СЃР»РѕР¶РЅРѕСЃС‚СЊ
         status = game.Status.ToString()
     });
 });
 
 
-// =============================================================
-// 3) Подключиться к игре
+// 3) РџРѕРґРєР»СЋС‡РёС‚СЊСЃСЏ Рє РёРіСЂРµ
 // POST /game/join
-// Принимаем JSON: { gameId, playerName }
-// =============================================================
+// РџСЂРёРЅРёРјР°РµРј JSON: { gameId, playerName }
 app.MapPost("/game/join", (JoinGameRequest req) =>
 {
-    // пытаемся подключить игрока
-    // метод возвращает true/false
+    // РїС‹С‚Р°РµРјСЃСЏ РїРѕРґРєР»СЋС‡РёС‚СЊ РёРіСЂРѕРєР°
+    // РјРµС‚РѕРґ РІРѕР·РІСЂР°С‰Р°РµС‚ true/false
     var ok = storage.JoinGame(req.GameId, req.PlayerName);
 
-    // если игра не найдена — возвращаем 404
+    // РµСЃР»Рё РёРіСЂР° РЅРµ РЅР°Р№РґРµРЅР° вЂ” РІРѕР·РІСЂР°С‰Р°РµРј 404
     if (!ok)
-        return Results.NotFound("Игра не найдена");
+        return Results.NotFound("РРіСЂР° РЅРµ РЅР°Р№РґРµРЅР°");
 
-    // получаем обновлённую игру
+    // РїРѕР»СѓС‡Р°РµРј РѕР±РЅРѕРІР»С‘РЅРЅСѓСЋ РёРіСЂСѓ
     var g = storage.GetGame(req.GameId);
 
-    // отправляем клиенту обновлённую информацию
+    // РѕС‚РїСЂР°РІР»СЏРµРј РєР»РёРµРЅС‚Сѓ РѕР±РЅРѕРІР»С‘РЅРЅСѓСЋ РёРЅС„РѕСЂРјР°С†РёСЋ
     return Results.Ok(new
     {
         gameId = g.GameId,
@@ -112,33 +97,25 @@ app.MapPost("/game/join", (JoinGameRequest req) =>
 
 
 // =============================================================
-// 4) Отправить результат игрока
+// 4) РћС‚РїСЂР°РІРёС‚СЊ СЂРµР·СѓР»СЊС‚Р°С‚ РёРіСЂРѕРєР°
 // POST /game/result
-// Принимаем JSON: { gameId, playerName, score, time }
+// РџСЂРёРЅРёРјР°РµРј JSON: { gameId, playerName, score, time }
 // =============================================================
+// 4) РћС‚РїСЂР°РІРёС‚СЊ СЂРµР·СѓР»СЊС‚Р°С‚ РёРіСЂРѕРєР°
 app.MapPost("/game/result", (ResultRequest req) =>
 {
-    // сохраняем результат игрока
-    // метод возвращает true/false
     var ok = storage.SubmitResult(req.GameId, req.PlayerName, req.Score, req.Time);
 
-    // если игра или игрок не найдены
     if (!ok)
-        return Results.NotFound("Игра не найдена или игрок отсутствует");
+        return Results.NotFound("РРіСЂР° РЅРµ РЅР°Р№РґРµРЅР° РёР»Рё РёРіСЂРѕРє РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚");
 
-    // после SubmitResult игра может быть удалена (если все игроки закончили)
     var g = storage.GetGame(req.GameId);
 
-    // если игра удалена — сообщаем клиенту
     if (g == null)
     {
-        return Results.Ok(new
-        {
-            deleted = true
-        });
+        return Results.Ok(new { deleted = true });
     }
 
-    // игра ещё существует — отправляем список игроков и их результаты
     return Results.Ok(new
     {
         deleted = false,
@@ -150,11 +127,35 @@ app.MapPost("/game/result", (ResultRequest req) =>
         }).ToList()
     });
 });
-// Подключаем контроллеры (на будущее)
+
+
+// в­ђв­ђв­ђ 5) РџРѕР»СѓС‡РёС‚СЊ СЂРµР·СѓР»СЊС‚Р°С‚С‹ РёРіСЂС‹ (РґР»СЏ СЃРµС‚РµРІРѕР№ СЃС‚Р°С‚РёСЃС‚РёРєРё)
+// GET /results/{id}
+app.MapGet("/results/{id}", (string id) =>
+{
+    var game = storage.GetGame(id);
+    if (game == null)
+        return Results.NotFound("РРіСЂР° РЅРµ РЅР°Р№РґРµРЅР°");
+
+    var results = game.Players
+        .OrderByDescending(p => p.Score)
+        .ThenBy(p => p.TimeSeconds)
+        .Select(p => new
+        {
+            playerName = p.PlayerName,
+            score = p.Score,
+            timeSeconds = p.TimeSeconds
+        })
+        .ToList();
+
+    return Results.Ok(results);
+});
+
+// РџРѕРґРєР»СЋС‡Р°РµРј РєРѕРЅС‚СЂРѕР»Р»РµСЂС‹ (РЅР° Р±СѓРґСѓС‰РµРµ)
 
 app.MapControllers();
 
-// Тестовый endpoint для проверки работы сервера
+// РўРµСЃС‚РѕРІС‹Р№ endpoint РґР»СЏ РїСЂРѕРІРµСЂРєРё СЂР°Р±РѕС‚С‹ СЃРµСЂРІРµСЂР°
 // GET /ping
 
 app.MapGet("/ping", () =>
@@ -162,5 +163,5 @@ app.MapGet("/ping", () =>
     return Results.Ok("pong");
 });
 
-// Запускаем сервер
+// Р—Р°РїСѓСЃРєР°РµРј СЃРµСЂРІРµСЂ
 app.Run();

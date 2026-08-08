@@ -106,5 +106,17 @@ namespace CrosswordServer.Storage
 
             return true;
         }
+        public List<GamePlayer>? GetResults(string id)
+        {
+            if (!_games.TryGetValue(id, out var game))
+                return null;
+
+            // уже отсортированные по очкам, потом по времени
+            return game.Players
+                .OrderByDescending(p => p.Score)
+                .ThenBy(p => p.TimeSeconds)
+                .ToList();
+        }
+
     }
 }
