@@ -92,20 +92,33 @@ namespace CrosswordServer.Storage
             player.Score = score;
             player.TimeSeconds = time;
 
-            // Проверяем: все ли игроки завершили игру?
-            bool allFinished = game.Players.All(p => p.Score > 0 || p.TimeSeconds > 0);
+            // Логируем отправку результата
+            Console.WriteLine($"[SERVER] Игрок {playerName} отправил результат: Score={score}, Time={time}");
 
+            // Проверяем завершение всех игроков
+            bool allFinished = game.Players.All(p => p.Score != 0 || p.TimeSeconds != 0);
+
+            int finishedCount = game.Players.Count(p => p.Score != 0 || p.TimeSeconds != 0);
+
+            Console.WriteLine($"[SERVER] Игра {id}: завершили {finishedCount} из {game.Players.Count}");
+
+            // Удаляем игру только когда ВСЕ присоединившиеся игроки завершили
             if (allFinished)
             {
-                // Помечаем игру завершённой.
+                Console.WriteLine($"[SERVER] Игра {id} удалена. Все игроки завершили.");
                 game.Status = GameStatus.Finished;
-
-                // Удаляем игру из списка.
                 _games.Remove(id);
             }
 
             return true;
         }
+
+
+
+
+
+     
+
         public List<GamePlayer>? GetResults(string id)
         {
             if (!_games.TryGetValue(id, out var game))
