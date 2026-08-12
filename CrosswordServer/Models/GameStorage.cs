@@ -72,7 +72,7 @@ namespace CrosswordServer.Storage
             });
 
             // Если игроков стало больше одного — считаем, что игра идёт.
-            if (game.Players.Count > 1)
+            if (game.Players.Count >= 1)
                 game.Status = GameStatus.Running;
 
             return true;
@@ -107,17 +107,21 @@ namespace CrosswordServer.Storage
             {
                 Console.WriteLine($"[SERVER] Игра {id} удалена. Все игроки завершили.");
                 game.Status = GameStatus.Finished;
-                _games.Remove(id);
+                //_games.Remove(id);
             }
 
             return true;
+        }
+
+        public void DeleteGame(string id)
+        {
+            _games.Remove(id);
         }
 
 
 
 
 
-     
 
         public List<GamePlayer>? GetResults(string id)
         {

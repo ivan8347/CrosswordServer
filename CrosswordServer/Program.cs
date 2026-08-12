@@ -131,7 +131,7 @@ app.MapPost("/game/result", (ResultRequest req) =>
 
 // ⭐⭐⭐ 5) Получить результаты игры (для сетевой статистики)
 // GET /results/{id}
-app.MapGet("/results/{id}", (string id) =>
+/*app.MapGet("/results/{id}", (string id) =>
 {
     var game = storage.GetGame(id);
     if (game == null)
@@ -149,6 +149,37 @@ app.MapGet("/results/{id}", (string id) =>
         .ToList();
 
     return Results.Ok(results);
+});*/
+
+
+app.MapGet("/results/{id}", (string id) =>
+{
+    var game = storage.GetGame(id);
+    if (game == null)
+        return Results.NotFound("Игра не найдена");
+
+    var results = game.Players
+        .OrderByDescending(p => p.Score)
+        .ThenBy(p => p.TimeSeconds)
+        .Select(p => new
+        {
+            playerName = p.PlayerName,
+            score = p.Score,
+            timeSeconds = p.TimeSeconds
+        })
+        .ToList();
+
+    // ⭐ СНАЧАЛА отдаём результаты клиенту
+    var response = Results.Ok(results);
+
+    // ⭐ А ПОТОМ удаляем игру, если она завершена
+    if (game.Status == GameStatus.Finished)
+    {
+        Console.WriteLine($"[SERVER] Игра {id} удалена после выдачи результатов.");
+        storage.DeleteGame(id);
+    }
+
+    return response;
 });
 
 // Подключаем контроллеры (на будущее)
