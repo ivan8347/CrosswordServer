@@ -102,7 +102,7 @@ app.MapPost("/game/join", (JoinGameRequest req) =>
 // Принимаем JSON: { gameId, playerName, score, time }
 // =============================================================
 // 4) Отправить результат игрока
-app.MapPost("/game/result", (ResultRequest req) =>
+/*app.MapPost("/game/result", (ResultRequest req) =>
 {
     var ok = storage.SubmitResult(req.GameId, req.PlayerName, req.Score, req.Time);
 
@@ -119,6 +119,86 @@ app.MapPost("/game/result", (ResultRequest req) =>
     return Results.Ok(new
     {
         deleted = false,
+        players = g.Players.Select(p => new
+        {
+            name = p.PlayerName,
+            score = p.Score,
+            time = p.TimeSeconds
+        }).ToList()
+    });
+});*/
+// =============================================================
+// 4) Отправить результат игрока + АВТОМАТИЧЕСКОЕ ЗАВЕРШЕНИЕ
+// POST /game/result
+// =============================================================
+/*app.MapPost("/game/result", async (ResultRequest req) =>
+{
+    // Пытаемся сохранить результат
+    var ok = storage.SubmitResult(req.GameId, req.PlayerName, req.Score, req.Time);
+
+    if (!ok)
+        return Results.NotFound("Игра не найдена или игрок отсутствует");
+
+    var g = storage.GetGame(req.GameId);
+    if (g == null)
+    {
+        return Results.Ok(new { deleted = true });
+    }
+
+    // ⭐⭐ ГЛАВНАЯ ЛОГИКА: Проверяем, сдали ли результаты ВСЕ игроки ⭐⭐
+    // Предполагаем, что если у всех игроков есть Score > 0 или Time > 0, значит они сдали
+    bool allPlayersReported = g.Players.All(p => p.Score > 0 || p.TimeSeconds > 0);
+
+    if (allPlayersReported && g.Status != GameStatus.Finished)
+    {
+        // Если все сдали — сразу помечаем игру как завершенную!
+        g.Status = GameStatus.Finished;
+        Console.WriteLine($"[SERVER] Игра {req.GameId} завершена: все игроки сдали результаты.");
+    }
+
+    return Results.Ok(new
+    {
+        deleted = false,
+        status = g.Status.ToString(),
+        players = g.Players.Select(p => new
+        {
+            name = p.PlayerName,
+            score = p.Score,
+            time = p.TimeSeconds
+        }).ToList()
+    });
+});*/
+app.MapPost("/game/result", (ResultRequest req) =>
+{
+    var ok = storage.SubmitResult(req.GameId, req.PlayerName, req.Score, req.Time);
+
+    if (!ok)
+        return Results.NotFound("Игра не найдена или игрок отсутствует");
+
+    var g = storage.GetGame(req.GameId);
+    if (g == null)
+    {
+        return Results.Ok(new { deleted = true });
+    }
+
+    // Проверяем, сдали ли результаты ВСЕ игроки
+    bool allPlayersReported = g.Players.All(p => p.Score > 0 || p.TimeSeconds > 0);
+
+    if (allPlayersReported && g.Status != GameStatus.Finished)
+    {
+        // Помечаем как завершённую
+        g.Status = GameStatus.Finished;
+        Console.WriteLine($"[SERVER] Игра {req.GameId} завершена: все игроки сдали результаты.");
+
+        // 👇 САМОЕ ВАЖНОЕ: удаляем игру из хранилища
+        storage.DeleteGame(req.GameId);
+        Console.WriteLine($"[SERVER] Игра {req.GameId} удалена из хранилища.");
+    }
+
+    return Results.Ok(new
+    {
+        deleted = false,
+        status = g.Status.ToString(),
         players = g.Players.Select(p => new
         {
             name = p.PlayerName,
@@ -152,7 +232,25 @@ app.MapPost("/game/result", (ResultRequest req) =>
 });*/
 
 
-app.MapGet("/results/{id}", (string id) =>
+// ⭐⭐⭐ НОВЫЙ ЭНДПОИНТ: Проверка статуса игры
+// GET /game/status/{id}
+app.MapGet("/game/status/{id}", (string id) =>
+{
+    var game = storage.GetGame(id);
+
+    if (game == null)
+        return Results.NotFound("Игра не найдена");
+
+    // Возвращаем простой JSON: {"isCompleted": true/false}
+    return Results.Ok(new
+    {
+        isCompleted = (game.Status == GameStatus.Finished)
+    });
+});
+
+
+
+/*app.MapGet("/results/{id}", (string id) =>
 {
     var game = storage.GetGame(id);
     if (game == null)
@@ -173,14 +271,47 @@ app.MapGet("/results/{id}", (string id) =>
     var response = Results.Ok(results);
 
     // ⭐ А ПОТОМ удаляем игру, если она завершена
-    if (game.Status == GameStatus.Finished)
+    //if (game.Status == GameStatus.Finished)
+    //{
+    //    Console.WriteLine($"[SERVER] Игра {id} удалена после выдачи результатов.");
+    //    storage.DeleteGame(id);
+    //}
+   // Проверяем, отправили ли ВСЕ игроки результаты
+    bool allPlayersReported =
+        game.Players.All(p => p.Score > 0 || p.TimeSeconds > 0);
+
+    if (allPlayersReported)
     {
         Console.WriteLine($"[SERVER] Игра {id} удалена после выдачи результатов.");
-        storage.DeleteGame(id);
+        game.Status = GameStatus.Finished;
     }
 
+
+
     return response;
+});*/
+// ⭐⭐ ПРОСТО ОТДАЧА РЕЗУЛЬТАТОВ ⭐⭐
+// GET /results/{id}
+app.MapGet("/results/{id}", (string id) =>
+{
+    var game = storage.GetGame(id);
+    if (game == null)
+        return Results.NotFound("Игра не найдена");
+
+    var results = game.Players
+        .OrderByDescending(p => p.Score)
+        .ThenBy(p => p.TimeSeconds)
+        .Select(p => new
+        {
+            playerName = p.PlayerName,
+            score = p.Score,
+            timeSeconds = p.TimeSeconds
+        })
+        .ToList();
+
+    return Results.Ok(results);
 });
+
 
 // Подключаем контроллеры (на будущее)
 
