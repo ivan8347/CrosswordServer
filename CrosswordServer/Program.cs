@@ -26,6 +26,7 @@ builder.WebHost.ConfigureKestrel(options =>
     options.ListenAnyIP(int.Parse(port));
 });
 
+//builder.WebHost.UseSetting("dotnet-hot-reload", "false");
 
 var app = builder.Build();
 
@@ -92,6 +93,24 @@ app.MapPost("/game/join", (JoinGameRequest req) =>
         status = g.Status.ToString()
     });
 });
+// 6) Получить статус игры
+app.MapGet("/game/status/{id}", (string id) =>
+{
+    var game = storage.GetGame(id);
+    if (game == null)
+        return Results.NotFound(new { error = "Game not found" });
+
+    return Results.Ok(new
+    {
+        gameId = game.GameId,
+        status = game.Status.ToString(),
+        difficulty = game.Difficulty,
+        creator = game.CreatorName,
+        playerCount = game.Players.Count,
+        isFull = game.Players.Count >= 2 // пример логики
+    });
+});
+
 
 // 4) Отправить результат игрока + авто‑удаление игры
 app.MapPost("/game/result", (ResultRequest req) =>
@@ -147,7 +166,7 @@ app.MapGet("/results/{id}", (string id) =>
 
     game.ResultsRequestsCount++;
     if (game.ResultsRequestsCount >= game.Players.Count)
-        storage.DeleteGame(id);
+       storage.DeleteGame(id);
 
     return response;
 });
