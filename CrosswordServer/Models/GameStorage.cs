@@ -118,11 +118,6 @@ namespace CrosswordServer.Storage
             _games.Remove(id);
         }
 
-
-
-
-
-
         public List<GamePlayer>? GetResults(string id)
         {
             if (!_games.TryGetValue(id, out var game))
@@ -134,6 +129,7 @@ namespace CrosswordServer.Storage
                 .ThenBy(p => p.TimeSeconds)
                 .ToList();
         }
+        public List<ChatMessage> GlobalChat { get; set; } = new();
 
     }
 }

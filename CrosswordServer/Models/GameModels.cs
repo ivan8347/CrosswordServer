@@ -51,5 +51,11 @@ namespace CrosswordServer.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime StartTime { get; set; }
         public int ResultsRequestsCount { get; set; } = 0;
+        public List<ChatMessage> GlobalChat { get; set; } = new();
+
+
+
+
+
     }
 }

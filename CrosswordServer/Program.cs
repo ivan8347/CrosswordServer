@@ -353,6 +353,20 @@ app.MapGet("/results/{id}", (string id) =>
 });
 
 
+app.MapPost("/chat", (ChatMessage msg) =>
+{
+    msg.Time = DateTime.UtcNow;
+    storage.GlobalChat.Add(msg);
+    return Results.Ok();
+});
+
+
+app.MapGet("/chat", () =>
+{
+    return Results.Ok(storage.GlobalChat.OrderBy(m => m.Time));
+});
+
+
 
 // Подключаем контроллеры (на будущее)
 
