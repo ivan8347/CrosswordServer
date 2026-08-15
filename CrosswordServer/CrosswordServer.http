@@ -1,6 +1,0 @@
-@CrosswordServer_HostAddress = https://crosswordserver.onrender.com
-
-GET {{CrosswordServer_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
