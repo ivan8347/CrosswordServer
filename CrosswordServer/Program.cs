@@ -155,7 +155,7 @@ app.MapPost("/game/result", (ResultRequest req) =>
 });
 
 // 5) Получить результаты игры
-/*app.MapGet("/results/{id}", (string id) =>
+app.MapGet("/results/{id}", (string id) =>
 {
     var game = storage.GetGame(id);
     if (game == null)
@@ -180,8 +180,8 @@ app.MapPost("/game/result", (ResultRequest req) =>
         storage.DeleteGame(id);
 
     return response;
-});*/
-app.MapGet("/results/{id}", (string id) =>
+});
+/*app.MapGet("/results/{id}", (string id) =>
 {
     var game = storage.GetGame(id);
     if (game == null)
@@ -212,7 +212,7 @@ app.MapGet("/results/{id}", (string id) =>
     }
 
     return response;
-});
+});*/
 // Чат
 app.MapPost("/chat", (ChatMessage msg) =>
 {
