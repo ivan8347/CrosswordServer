@@ -6,7 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Отключаем FileSystemWatcher — обязательно для Render
 builder.Host.ConfigureHostOptions(options =>
 {
-    options.DisableFileSystemWatcher = true;
+    //options.DisableFileSystemWatcher = true;
 });
 
 // Добавляем поддержку Swagger
