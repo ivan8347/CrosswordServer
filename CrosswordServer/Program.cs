@@ -21,12 +21,12 @@ builder.Services.AddSingleton<GameStorage>();
 
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5270";
 
-builder.WebHost.ConfigureKestrel(options =>
-{
-    options.ListenAnyIP(int.Parse(port));
-});
+//builder.WebHost.ConfigureKestrel(options =>
+//{
+//    options.ListenAnyIP(int.Parse(port));
+//});
 
-//builder.WebHost.UseSetting("dotnet-hot-reload", "false");
+builder.WebHost.UseSetting("dotnet-hot-reload", "false");
 
 var app = builder.Build();
 
@@ -107,7 +107,7 @@ app.MapGet("/game/status/{id}", (string id) =>
         difficulty = game.Difficulty,
         creator = game.CreatorName,
         playerCount = game.Players.Count,
-        isFull = game.Players.Count >= 2 // пример логики
+        isFull = game.Players.Count >=2 // пример логики
     });
 });
 
@@ -166,7 +166,7 @@ app.MapGet("/results/{id}", (string id) =>
 
     game.ResultsRequestsCount++;
     if (game.ResultsRequestsCount >= game.Players.Count)
-       storage.DeleteGame(id);
+        storage.DeleteGame(id);
 
     return response;
 });
