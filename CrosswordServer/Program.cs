@@ -94,7 +94,7 @@ app.MapPost("/game/join", (JoinGameRequest req) =>
     });
 });
 // 6) Получить статус игры
-app.MapGet("/game/status/{id}", (string id) =>
+/*app.MapGet("/game/status/{id}", (string id) =>
 {
     var game = storage.GetGame(id);
     if (game == null)
@@ -109,8 +109,18 @@ app.MapGet("/game/status/{id}", (string id) =>
         playerCount = game.Players.Count,
         isFull = game.Players.Count >=2 // пример логики
     });
+});*/
+app.MapGet("/game/status/{id}", (string id) =>
+{
+    var game = storage.GetGame(id);
+    if (game == null)
+        return Results.NotFound("Игра не найдена");
+    // Возвращаем простой JSON: {"isCompleted": true/false}
+    return Results.Ok(new
+    {
+        isCompleted = (game.Status == GameStatus.Finished)
+    });
 });
-
 
 // 4) Отправить результат игрока + авто‑удаление игры
 app.MapPost("/game/result", (ResultRequest req) =>
