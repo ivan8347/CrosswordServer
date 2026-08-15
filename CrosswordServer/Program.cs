@@ -19,6 +19,14 @@ builder.Services.AddControllers();
 // Добавляем хранилище игр как Singleton
 builder.Services.AddSingleton<GameStorage>();
 
+var port = Environment.GetEnvironmentVariable("PORT") ?? "5270";
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(int.Parse(port));
+});
+
+
 var app = builder.Build();
 
 // Включаем Swagger UI
