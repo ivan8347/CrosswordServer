@@ -155,7 +155,7 @@ app.MapPost("/game/result", (ResultRequest req) =>
 });
 
 // 5) Получить результаты игры
-app.MapGet("/results/{id}", (string id) =>
+/*app.MapGet("/results/{id}", (string id) =>
 {
     var game = storage.GetGame(id);
     if (game == null)
@@ -175,12 +175,44 @@ app.MapGet("/results/{id}", (string id) =>
     var response = Results.Ok(results);
 
     game.ResultsRequestsCount++;
+
     if (game.ResultsRequestsCount >= game.Players.Count)
         storage.DeleteGame(id);
 
     return response;
-});
+});*/
+app.MapGet("/results/{id}", (string id) =>
+{
+    var game = storage.GetGame(id);
+    if (game == null)
+        return Results.NotFound("Игра не найдена");
 
+    var results = game.Players
+        .OrderByDescending(p => p.Score)
+        .ThenBy(p => p.TimeSeconds)
+        .Select(p => new
+        {
+            playerName = p.PlayerName,
+            score = p.Score,
+            timeSeconds = p.TimeSeconds
+        })
+        .ToList();
+
+    // ⭐ Отдаём результаты клиенту
+    var response = Results.Ok(results);
+
+    // ⭐ Увеличиваем счётчик запросов
+    game.ResultsRequestsCount++;
+
+    // ⭐ Если ВСЕ игроки запросили результаты — удаляем игру
+    if (game.ResultsRequestsCount >= game.Players.Count)
+    {
+        Console.WriteLine($"[SERVER] Игра {id} удалена после выдачи результатов всеми игроками.");
+        storage.DeleteGame(id);
+    }
+
+    return response;
+});
 // Чат
 app.MapPost("/chat", (ChatMessage msg) =>
 {
