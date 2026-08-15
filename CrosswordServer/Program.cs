@@ -292,6 +292,33 @@ app.MapGet("/game/status/{id}", (string id) =>
 });*/
 // ⭐⭐ ПРОСТО ОТДАЧА РЕЗУЛЬТАТОВ ⭐⭐
 // GET /results/{id}
+/*app.MapGet("/results/{id}", (string id) =>
+{
+    var game = storage.GetGame(id);
+    if (game == null)
+        return Results.NotFound("Игра не найдена");
+
+    var results = game.Players
+        .OrderByDescending(p => p.Score)
+        .ThenBy(p => p.TimeSeconds)
+        .Select(p => new
+        {
+            playerName = p.PlayerName,
+            score = p.Score,
+            timeSeconds = p.TimeSeconds
+        })
+        .ToList();
+
+    //if (game.Status == GameStatus.Finished)
+    //{
+    //    Console.WriteLine($"[SERVER] Игра {id} удалена после выдачи результатов.");
+    //    storage.DeleteGame(id);
+    //}
+    return Results.Ok(results);
+});*/
+
+
+
 app.MapGet("/results/{id}", (string id) =>
 {
     var game = storage.GetGame(id);
@@ -309,8 +336,22 @@ app.MapGet("/results/{id}", (string id) =>
         })
         .ToList();
 
-    return Results.Ok(results);
+    // ⭐ Отдаём результаты клиенту
+    var response = Results.Ok(results);
+
+    // ⭐ Увеличиваем счётчик запросов
+    game.ResultsRequestsCount++;
+
+    // ⭐ Если ВСЕ игроки запросили результаты — удаляем игру
+    if (game.ResultsRequestsCount >= game.Players.Count)
+    {
+        Console.WriteLine($"[SERVER] Игра {id} удалена после выдачи результатов всеми игроками.");
+        storage.DeleteGame(id);
+    }
+
+    return response;
 });
+
 
 
 // Подключаем контроллеры (на будущее)

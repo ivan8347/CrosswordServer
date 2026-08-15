@@ -50,5 +50,6 @@ namespace CrosswordServer.Models
         /// удалять старые игры или сортировать список.
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime StartTime { get; set; }
+        public int ResultsRequestsCount { get; set; } = 0;
     }
 }
