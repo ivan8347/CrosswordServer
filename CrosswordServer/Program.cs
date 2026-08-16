@@ -1,4 +1,4 @@
-﻿using CrosswordServer.Storage;
+﻿/*using CrosswordServer.Storage;
 using CrosswordServer.Models;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,12 +21,12 @@ builder.Services.AddSingleton<GameStorage>();
 
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5270";
 
-//builder.WebHost.ConfigureKestrel(options =>
-//{
-//    options.ListenAnyIP(int.Parse(port));
-//});
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(int.Parse(port));
+});
 
-builder.WebHost.UseSetting("dotnet-hot-reload", "false");
+//builder.WebHost.UseSetting("dotnet-hot-reload", "false");
 
 var app = builder.Build();
 
@@ -109,7 +109,7 @@ app.MapPost("/game/join", (JoinGameRequest req) =>
         playerCount = game.Players.Count,
         isFull = game.Players.Count >=2 // пример логики
     });
-});*/
+});
 app.MapGet("/game/status/{id}", (string id) =>
 {
     var game = storage.GetGame(id);
@@ -155,7 +155,7 @@ app.MapPost("/game/result", (ResultRequest req) =>
 });
 
 // 5) Получить результаты игры
-app.MapGet("/results/{id}", (string id) =>
+/*app.MapGet("/results/{id}", (string id) =>
 {
     var game = storage.GetGame(id);
     if (game == null)
@@ -181,7 +181,7 @@ app.MapGet("/results/{id}", (string id) =>
 
     return response;
 });
-/*app.MapGet("/results/{id}", (string id) =>
+app.MapGet("/results/{id}", (string id) =>
 {
     var game = storage.GetGame(id);
     if (game == null)
@@ -212,7 +212,7 @@ app.MapGet("/results/{id}", (string id) =>
     }
 
     return response;
-});*/
+});
 // Чат
 app.MapPost("/chat", (ChatMessage msg) =>
 {
@@ -230,4 +230,174 @@ app.MapGet("/chat", () =>
 app.MapGet("/ping", () => Results.Ok("pong"));
 
 // Запуск сервера
+app.Run();*/
+using CrosswordServer.Storage;
+using CrosswordServer.Models;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// ОБЯЗАТЕЛЬНО ДЛЯ RENDER
+builder.Host.ConfigureHostOptions(options =>
+{
+    //options.DisableFileSystemWatcher = true;
+});
+
+// Минимальные эндпоинты — без контроллеров
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// Хранилище игр
+builder.Services.AddSingleton<GameStorage>();
+
+var port = Environment.GetEnvironmentVariable("PORT") ?? "5270";
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(int.Parse(port));
+});
+
+var app = builder.Build();
+
+// Swagger только в Development
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+// Маршрут проверки
+app.MapGet("/", () => "Server is running!");
+
+// Хранилище
+var storage = app.Services.GetRequiredService<GameStorage>();
+
+// ==========================
+// ЭНДПОИНТЫ
+// ==========================
+
+app.MapGet("/games", () =>
+{
+    var games = storage.GetAllGames();
+    return Results.Ok(games.Select(g => new
+    {
+        gameId = g.GameId,
+        creator = g.CreatorName,
+        players = g.Players.Select(p => p.PlayerName),
+        status = g.Status.ToString(),
+        difficulty = g.Difficulty
+    }));
+});
+
+app.MapPost("/game/create", (CreateGameRequest req) =>
+{
+    var game = storage.CreateGame(req.CreatorName, req.Difficulty);
+    return Results.Ok(new
+    {
+        gameId = game.GameId,
+        seed = game.Seed,
+        creator = game.CreatorName,
+        difficulty = game.Difficulty,
+        status = game.Status.ToString()
+    });
+});
+
+app.MapPost("/game/join", (JoinGameRequest req) =>
+{
+    var ok = storage.JoinGame(req.GameId, req.PlayerName);
+    if (!ok)
+        return Results.NotFound("Игра не найдена");
+
+    var g = storage.GetGame(req.GameId);
+    return Results.Ok(new
+    {
+        gameId = g.GameId,
+        seed = g.Seed,
+        creator = g.CreatorName,
+        players = g.Players.Select(p => p.PlayerName).ToList(),
+        status = g.Status.ToString()
+    });
+});
+
+app.MapGet("/game/status/{id}", (string id) =>
+{
+    var game = storage.GetGame(id);
+    if (game == null)
+        return Results.NotFound("Игра не найдена");
+
+    return Results.Ok(new
+    {
+        isCompleted = (game.Status == GameStatus.Finished)
+    });
+});
+
+app.MapPost("/game/result", (ResultRequest req) =>
+{
+    var ok = storage.SubmitResult(req.GameId, req.PlayerName, req.Score, req.Time);
+    if (!ok)
+        return Results.NotFound("Игра не найдена или игрок отсутствует");
+
+    var g = storage.GetGame(req.GameId);
+    if (g == null)
+        return Results.Ok(new { deleted = true });
+
+    bool allPlayersReported = g.Players.All(p => p.Score > 0 || p.TimeSeconds > 0);
+
+    if (allPlayersReported && g.Status != GameStatus.Finished)
+    {
+        g.Status = GameStatus.Finished;
+        storage.DeleteGame(req.GameId);
+    }
+
+    return Results.Ok(new
+    {
+        deleted = false,
+        status = g.Status.ToString(),
+        players = g.Players.Select(p => new
+        {
+            name = p.PlayerName,
+            score = p.Score,
+            time = p.TimeSeconds
+        }).ToList()
+    });
+});
+
+app.MapGet("/results/{id}", (string id) =>
+{
+    var game = storage.GetGame(id);
+    if (game == null)
+        return Results.NotFound("Игра не найдена");
+
+    var results = game.Players
+        .OrderByDescending(p => p.Score)
+        .ThenBy(p => p.TimeSeconds)
+        .Select(p => new
+        {
+            playerName = p.PlayerName,
+            score = p.Score,
+            timeSeconds = p.TimeSeconds
+        })
+        .ToList();
+
+    game.ResultsRequestsCount++;
+
+    if (game.ResultsRequestsCount >= game.Players.Count)
+        storage.DeleteGame(id);
+
+    return Results.Ok(results);
+});
+
+app.MapPost("/chat", (ChatMessage msg) =>
+{
+    msg.Time = DateTime.UtcNow;
+    storage.GlobalChat.Add(msg);
+    return Results.Ok();
+});
+
+app.MapGet("/chat", () =>
+{
+    return Results.Ok(storage.GlobalChat.OrderBy(m => m.Time));
+});
+
+app.MapGet("/ping", () => Results.Ok("pong"));
+
 app.Run();
