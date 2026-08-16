@@ -91,6 +91,7 @@ namespace CrosswordServer.Storage
 
             player.Score = score;
             player.TimeSeconds = time;
+            player.HasReported = true;
 
             // Логируем отправку результата
             Console.WriteLine($"[SERVER] Игрок {playerName} отправил результат: Score={score}, Time={time}");

@@ -22,6 +22,8 @@ namespace CrosswordServer.Models
         /// Время прохождения в секундах (тоже можно заполнить позже).
         public int TimeSeconds { get; set; }
         public bool IsSubmitted { get; set; } = false;
+        public bool HasReported { get; set; }
+
     }
 
     /// Основная модель игры, которая будет храниться на сервере.

@@ -330,6 +330,36 @@ app.MapGet("/game/status/{id}", (string id) =>
     });
 });
 
+/*app.MapPost("/game/result", (ResultRequest req) =>
+{
+    var ok = storage.SubmitResult(req.GameId, req.PlayerName, req.Score, req.Time);
+    if (!ok)
+        return Results.NotFound("Игра не найдена или игрок отсутствует");
+
+    var g = storage.GetGame(req.GameId);
+    if (g == null)
+        return Results.Ok(new { deleted = true });
+
+    bool allPlayersReported = g.Players.All(p => p.Score > 1 || p.TimeSeconds > 1);
+
+    if (allPlayersReported && g.Status != GameStatus.Finished)
+    {
+        g.Status = GameStatus.Finished;
+        storage.DeleteGame(req.GameId);
+    }
+
+    return Results.Ok(new
+    {
+        deleted = false,
+        status = g.Status.ToString(),
+        players = g.Players.Select(p => new
+        {
+            name = p.PlayerName,
+            score = p.Score,
+            time = p.TimeSeconds
+        }).ToList()
+    });
+});*/
 app.MapPost("/game/result", (ResultRequest req) =>
 {
     var ok = storage.SubmitResult(req.GameId, req.PlayerName, req.Score, req.Time);
@@ -340,7 +370,8 @@ app.MapPost("/game/result", (ResultRequest req) =>
     if (g == null)
         return Results.Ok(new { deleted = true });
 
-    bool allPlayersReported = g.Players.All(p => p.Score > 0 || p.TimeSeconds > 0);
+    // ⭐ Правильная проверка
+    bool allPlayersReported = g.Players.All(p => p.HasReported);
 
     if (allPlayersReported && g.Status != GameStatus.Finished)
     {
