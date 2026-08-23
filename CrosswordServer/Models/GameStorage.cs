@@ -5,8 +5,6 @@ using CrosswordServer.Models;
 
 namespace CrosswordServer.Storage
 {
-    // Хранилище всех игр на сервере.
-    // Здесь создаём игры, подключаем игроков, принимаем результаты и удаляем завершённые игры.
     public class GameStorage
     {
         // Все активные игры.
@@ -133,4 +131,13 @@ namespace CrosswordServer.Storage
         public List<ChatMessage> GlobalChat { get; set; } = new();
 
     }
+    public class ScoreRecord
+    {
+        public string PlayerName { get; set; }
+        public int Score { get; set; }
+        public int TimeSeconds { get; set; }
+        public string Difficulty { get; set; }
+        public DateTime Date { get; set; }
+    }
+
 }
