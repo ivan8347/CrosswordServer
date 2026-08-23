@@ -402,6 +402,12 @@ app.MapPost("/game/result", (ResultRequest req) =>
     
 
 });
+app.MapGet("/rating", () =>
+{
+    return Results.Ok(storage.GlobalScores
+        .OrderByDescending(s => s.Score)
+        .ThenBy(s => s.TimeSeconds));
+});
 
 app.MapGet("/results/{id}", (string id) =>
 {
@@ -439,12 +445,7 @@ app.MapGet("/chat", () =>
 {
     return Results.Ok(storage.GlobalChat.OrderBy(m => m.Time));
 });
-app.MapGet("/rating", () =>
-{
-    return Results.Ok(storage.GlobalScores
-        .OrderByDescending(s => s.Score)
-        .ThenBy(s => s.TimeSeconds));
-});
+
 
 app.MapGet("/ping", () => Results.Ok("pong"));
 
