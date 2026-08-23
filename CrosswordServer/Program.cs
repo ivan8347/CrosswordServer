@@ -390,15 +390,6 @@ app.MapPost("/game/result", (ResultRequest req) =>
             time = p.TimeSeconds
         }).ToList()
     });
-    storage.GlobalScores.Add(new ScoreRecord
-    {
-        PlayerName = req.PlayerName,
-        Score = req.Score,
-        TimeSeconds = req.Time,
-        Difficulty = g.Difficulty,
-        Date = DateTime.UtcNow
-    });
-
 });
 
 app.MapGet("/results/{id}", (string id) =>
@@ -441,18 +432,3 @@ app.MapGet("/chat", () =>
 app.MapGet("/ping", () => Results.Ok("pong"));
 
 app.Run();
-app.MapGet("/rating", () =>
-{
-    var allScores = storage.GlobalScores
-        .OrderByDescending(s => s.Score)
-        .ThenBy(s => s.TimeSeconds)
-        .Select(s => new {
-            name = s.PlayerName,
-            score = s.Score,
-            time = s.TimeSeconds,
-            difficulty = s.Difficulty,
-            date = s.Date
-        });
-
-    return Results.Ok(allScores);
-});
