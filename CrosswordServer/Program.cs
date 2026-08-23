@@ -370,7 +370,7 @@ app.MapPost("/game/result", (ResultRequest req) =>
     if (g == null)
         return Results.Ok(new { deleted = true });
 
-    storage.GlobalScores.Add(new CrosswordServer.Storage.ScoreRecord
+    storage.GlobalScores.Add(new GameStorage.ScoreRecord
     {
         PlayerName = req.PlayerName,
         Score = req.Score,
@@ -378,6 +378,7 @@ app.MapPost("/game/result", (ResultRequest req) =>
         Difficulty = g.Difficulty,
         Date = DateTime.UtcNow
     });
+
 
 
     // ⭐ Правильная проверка
