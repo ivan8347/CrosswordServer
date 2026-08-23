@@ -9,6 +9,15 @@ namespace CrosswordServer.Storage
     // Здесь создаём игры, подключаем игроков, принимаем результаты и удаляем завершённые игры.
     public class GameStorage
     {
+        public class ScoreRecord
+        {
+            public string PlayerName { get; set; }
+            public int Score { get; set; }
+            public int TimeSeconds { get; set; }
+            public string Difficulty { get; set; }
+            public DateTime Date { get; set; }
+        }
+
         // Все активные игры.
         // Ключ — GameId (например "123456").
         // Значение — GameInfo.
@@ -131,6 +140,7 @@ namespace CrosswordServer.Storage
                 .ToList();
         }
         public List<ChatMessage> GlobalChat { get; set; } = new();
+        public List<ScoreRecord> GlobalScores { get; set; } = new();
 
     }
 }
