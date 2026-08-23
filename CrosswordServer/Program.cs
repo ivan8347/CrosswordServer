@@ -370,6 +370,15 @@ app.MapPost("/game/result", (ResultRequest req) =>
     if (g == null)
         return Results.Ok(new { deleted = true });
 
+    storage.GlobalScores.Add(new ScoreRecord
+    {
+        PlayerName = req.PlayerName,
+        Score = req.Score,
+        TimeSeconds = req.Time,
+        Difficulty = g.Difficulty,
+        Date = DateTime.UtcNow
+    });
+
     // ⭐ Правильная проверка
     bool allPlayersReported = g.Players.All(p => p.HasReported);
 
@@ -390,14 +399,7 @@ app.MapPost("/game/result", (ResultRequest req) =>
             time = p.TimeSeconds
         }).ToList()
     });
-    storage.GlobalScores.Add(new ScoreRecord
-    {
-        PlayerName = req.PlayerName,
-        Score = req.Score,
-        TimeSeconds = req.Time,
-        Difficulty = g.Difficulty,
-        Date = DateTime.UtcNow
-    });
+    
 
 });
 
