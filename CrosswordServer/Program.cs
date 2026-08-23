@@ -1,252 +1,19 @@
-﻿/*using CrosswordServer.Storage;
+﻿using CrosswordServer.Storage;
 using CrosswordServer.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Отключаем FileSystemWatcher — обязательно для Render
-builder.Host.ConfigureHostOptions(options =>
+// Отключаем мониторинг файлов — обязательно для Render (чтобы не было inotify error)
+foreach (var provider in builder.Configuration.Providers)
 {
-    //options.DisableFileSystemWatcher = true;
-});
+    if (provider is Microsoft.Extensions.Configuration.Json.JsonConfigurationProvider jsonProvider)
+    {
+        jsonProvider.ReloadOnChange = false;
+    }
+}
 
-// Добавляем поддержку Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
-// Добавляем контроллеры
-builder.Services.AddControllers();
-
-// Добавляем хранилище игр как Singleton
-builder.Services.AddSingleton<GameStorage>();
-
-var port = Environment.GetEnvironmentVariable("PORT") ?? "5270";
-
-builder.WebHost.ConfigureKestrel(options =>
-{
-    options.ListenAnyIP(int.Parse(port));
-});
-
-//builder.WebHost.UseSetting("dotnet-hot-reload", "false");
-
-var app = builder.Build();
-
-// Включаем Swagger UI
-app.UseSwagger();
-app.UseSwaggerUI();
-
-// Маршрут для проверки
-app.MapGet("/", () => "Server is running!");
-
-// Подключаем контроллеры
-app.MapControllers();
-
-// ==========================
-// ТВОИ ЭНДПОИНТЫ
-// ==========================
-
-// Хранилище игр
-var storage = app.Services.GetRequiredService<GameStorage>();
-
-// 1) Получить список всех игр
-app.MapGet("/games", () =>
-{
-    var games = storage.GetAllGames();
-    var result = games.Select(g => new
-    {
-        gameId = g.GameId,
-        creator = g.CreatorName,
-        players = g.Players.Select(p => p.PlayerName),
-        status = g.Status.ToString(),
-        difficulty = g.Difficulty
-    });
-    return Results.Ok(result);
-});
-
-// 2) Создать игру
-app.MapPost("/game/create", (CreateGameRequest req) =>
-{
-    var game = storage.CreateGame(req.CreatorName, req.Difficulty);
-    return Results.Ok(new
-    {
-        gameId = game.GameId,
-        seed = game.Seed,
-        creator = game.CreatorName,
-        difficulty = game.Difficulty,
-        status = game.Status.ToString()
-    });
-});
-
-// 3) Подключиться к игре
-app.MapPost("/game/join", (JoinGameRequest req) =>
-{
-    var ok = storage.JoinGame(req.GameId, req.PlayerName);
-    if (!ok)
-        return Results.NotFound("Игра не найдена");
-
-    var g = storage.GetGame(req.GameId);
-    return Results.Ok(new
-    {
-        gameId = g.GameId,
-        seed = g.Seed,
-        creator = g.CreatorName,
-        players = g.Players.Select(p => p.PlayerName).ToList(),
-        status = g.Status.ToString()
-    });
-});
-// 6) Получить статус игры
-/*app.MapGet("/game/status/{id}", (string id) =>
-{
-    var game = storage.GetGame(id);
-    if (game == null)
-        return Results.NotFound(new { error = "Game not found" });
-
-    return Results.Ok(new
-    {
-        gameId = game.GameId,
-        status = game.Status.ToString(),
-        difficulty = game.Difficulty,
-        creator = game.CreatorName,
-        playerCount = game.Players.Count,
-        isFull = game.Players.Count >=2 // пример логики
-    });
-});
-app.MapGet("/game/status/{id}", (string id) =>
-{
-    var game = storage.GetGame(id);
-    if (game == null)
-        return Results.NotFound("Игра не найдена");
-    // Возвращаем простой JSON: {"isCompleted": true/false}
-    return Results.Ok(new
-    {
-        isCompleted = (game.Status == GameStatus.Finished)
-    });
-});
-
-// 4) Отправить результат игрока + авто‑удаление игры
-app.MapPost("/game/result", (ResultRequest req) =>
-{
-    var ok = storage.SubmitResult(req.GameId, req.PlayerName, req.Score, req.Time);
-    if (!ok)
-        return Results.NotFound("Игра не найдена или игрок отсутствует");
-
-    var g = storage.GetGame(req.GameId);
-    if (g == null)
-        return Results.Ok(new { deleted = true });
-
-    bool allPlayersReported = g.Players.All(p => p.Score > 0 || p.TimeSeconds > 0);
-
-    if (allPlayersReported && g.Status != GameStatus.Finished)
-    {
-        g.Status = GameStatus.Finished;
-        storage.DeleteGame(req.GameId);
-    }
-
-    return Results.Ok(new
-    {
-        deleted = false,
-        status = g.Status.ToString(),
-        players = g.Players.Select(p => new
-        {
-            name = p.PlayerName,
-            score = p.Score,
-            time = p.TimeSeconds
-        }).ToList()
-    });
-});
-
-// 5) Получить результаты игры
-/*app.MapGet("/results/{id}", (string id) =>
-{
-    var game = storage.GetGame(id);
-    if (game == null)
-        return Results.NotFound("Игра не найдена");
-
-    var results = game.Players
-        .OrderByDescending(p => p.Score)
-        .ThenBy(p => p.TimeSeconds)
-        .Select(p => new
-        {
-            playerName = p.PlayerName,
-            score = p.Score,
-            timeSeconds = p.TimeSeconds
-        })
-        .ToList();
-
-    var response = Results.Ok(results);
-
-    game.ResultsRequestsCount++;
-
-    if (game.ResultsRequestsCount >= game.Players.Count)
-        storage.DeleteGame(id);
-
-    return response;
-});
-app.MapGet("/results/{id}", (string id) =>
-{
-    var game = storage.GetGame(id);
-    if (game == null)
-        return Results.NotFound("Игра не найдена");
-
-    var results = game.Players
-        .OrderByDescending(p => p.Score)
-        .ThenBy(p => p.TimeSeconds)
-        .Select(p => new
-        {
-            playerName = p.PlayerName,
-            score = p.Score,
-            timeSeconds = p.TimeSeconds
-        })
-        .ToList();
-
-    // ⭐ Отдаём результаты клиенту
-    var response = Results.Ok(results);
-
-    // ⭐ Увеличиваем счётчик запросов
-    game.ResultsRequestsCount++;
-
-    // ⭐ Если ВСЕ игроки запросили результаты — удаляем игру
-    if (game.ResultsRequestsCount >= game.Players.Count)
-    {
-        Console.WriteLine($"[SERVER] Игра {id} удалена после выдачи результатов всеми игроками.");
-        storage.DeleteGame(id);
-    }
-
-    return response;
-});
-// Чат
-app.MapPost("/chat", (ChatMessage msg) =>
-{
-    msg.Time = DateTime.UtcNow;
-    storage.GlobalChat.Add(msg);
-    return Results.Ok();
-});
-
-app.MapGet("/chat", () =>
-{
-    return Results.Ok(storage.GlobalChat.OrderBy(m => m.Time));
-});
-
-// Ping
-app.MapGet("/ping", () => Results.Ok("pong"));
-
-// Запуск сервера
-app.Run();*/
-using CrosswordServer.Storage;
-using CrosswordServer.Models;
-
-var builder = WebApplication.CreateBuilder(args);
-
-// ОБЯЗАТЕЛЬНО ДЛЯ RENDER
-builder.Host.ConfigureHostOptions(options =>
-{
-    //options.DisableFileSystemWatcher = true;
-});
-
-// Минимальные эндпоинты — без контроллеров
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
-// Хранилище игр
 builder.Services.AddSingleton<GameStorage>();
 
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5270";
@@ -258,23 +25,17 @@ builder.WebHost.ConfigureKestrel(options =>
 
 var app = builder.Build();
 
-// Swagger только в Development
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-// Маршрут проверки
 app.MapGet("/", () => "Server is running!");
 
-// Хранилище
 var storage = app.Services.GetRequiredService<GameStorage>();
 
-// ==========================
-// ЭНДПОИНТЫ
-// ==========================
-
+// Список всех игр — сложность уже есть
 app.MapGet("/games", () =>
 {
     var games = storage.GetAllGames();
@@ -284,10 +45,11 @@ app.MapGet("/games", () =>
         creator = g.CreatorName,
         players = g.Players.Select(p => p.PlayerName),
         status = g.Status.ToString(),
-        difficulty = g.Difficulty
+        difficulty = g.Difficulty          // ✅ сложность передаётся
     }));
 });
 
+// Создание игры — сложность уже есть
 app.MapPost("/game/create", (CreateGameRequest req) =>
 {
     var game = storage.CreateGame(req.CreatorName, req.Difficulty);
@@ -296,11 +58,12 @@ app.MapPost("/game/create", (CreateGameRequest req) =>
         gameId = game.GameId,
         seed = game.Seed,
         creator = game.CreatorName,
-        difficulty = game.Difficulty,
+        difficulty = game.Difficulty,      // ✅ сложность передаётся
         status = game.Status.ToString()
     });
 });
 
+// Подключение к игре — ДОБАВЛЕНО difficulty
 app.MapPost("/game/join", (JoinGameRequest req) =>
 {
     var ok = storage.JoinGame(req.GameId, req.PlayerName);
@@ -313,11 +76,13 @@ app.MapPost("/game/join", (JoinGameRequest req) =>
         gameId = g.GameId,
         seed = g.Seed,
         creator = g.CreatorName,
+        difficulty = g.Difficulty,          // ✅ добавлено
         players = g.Players.Select(p => p.PlayerName).ToList(),
         status = g.Status.ToString()
     });
 });
 
+// Статус игры — ДОБАВЛЕНО difficulty
 app.MapGet("/game/status/{id}", (string id) =>
 {
     var game = storage.GetGame(id);
@@ -326,40 +91,12 @@ app.MapGet("/game/status/{id}", (string id) =>
 
     return Results.Ok(new
     {
-        isCompleted = (game.Status == GameStatus.Finished)
+        isCompleted = (game.Status == GameStatus.Finished),
+        difficulty = game.Difficulty         // ✅ добавлено
     });
 });
 
-/*app.MapPost("/game/result", (ResultRequest req) =>
-{
-    var ok = storage.SubmitResult(req.GameId, req.PlayerName, req.Score, req.Time);
-    if (!ok)
-        return Results.NotFound("Игра не найдена или игрок отсутствует");
-
-    var g = storage.GetGame(req.GameId);
-    if (g == null)
-        return Results.Ok(new { deleted = true });
-
-    bool allPlayersReported = g.Players.All(p => p.Score > 1 || p.TimeSeconds > 1);
-
-    if (allPlayersReported && g.Status != GameStatus.Finished)
-    {
-        g.Status = GameStatus.Finished;
-        storage.DeleteGame(req.GameId);
-    }
-
-    return Results.Ok(new
-    {
-        deleted = false,
-        status = g.Status.ToString(),
-        players = g.Players.Select(p => new
-        {
-            name = p.PlayerName,
-            score = p.Score,
-            time = p.TimeSeconds
-        }).ToList()
-    });
-});*/
+// Отправка результата — сложность не нужна в ответе, но можно добавить для удобства
 app.MapPost("/game/result", (ResultRequest req) =>
 {
     var ok = storage.SubmitResult(req.GameId, req.PlayerName, req.Score, req.Time);
@@ -370,7 +107,6 @@ app.MapPost("/game/result", (ResultRequest req) =>
     if (g == null)
         return Results.Ok(new { deleted = true });
 
-    // ⭐ Правильная проверка
     bool allPlayersReported = g.Players.All(p => p.HasReported);
 
     if (allPlayersReported && g.Status != GameStatus.Finished)
@@ -383,6 +119,7 @@ app.MapPost("/game/result", (ResultRequest req) =>
     {
         deleted = false,
         status = g.Status.ToString(),
+        difficulty = g.Difficulty,            // ✅ добавлено (опционально)
         players = g.Players.Select(p => new
         {
             name = p.PlayerName,
@@ -392,6 +129,7 @@ app.MapPost("/game/result", (ResultRequest req) =>
     });
 });
 
+// Результаты игры — ДОБАВЛЕНО difficulty
 app.MapGet("/results/{id}", (string id) =>
 {
     var game = storage.GetGame(id);
@@ -414,9 +152,14 @@ app.MapGet("/results/{id}", (string id) =>
     if (game.ResultsRequestsCount >= game.Players.Count)
         storage.DeleteGame(id);
 
-    return Results.Ok(results);
+    return Results.Ok(new
+    {
+        difficulty = game.Difficulty,         // ✅ добавлено
+        results = results
+    });
 });
 
+// Чат
 app.MapPost("/chat", (ChatMessage msg) =>
 {
     msg.Time = DateTime.UtcNow;
