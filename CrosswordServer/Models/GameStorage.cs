@@ -14,6 +14,9 @@ namespace CrosswordServer.Storage
             public int TimeSeconds { get; set; }
             public string Difficulty { get; set; }
             public DateTime Date { get; set; }
+            public string TimeFormatted => TimeSpan.FromSeconds(TimeSeconds).ToString(@"mm\:ss");
+
+
         }
         // Все активные игры.
         // Ключ — GameId (например "123456").
