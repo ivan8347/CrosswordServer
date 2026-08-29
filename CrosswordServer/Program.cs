@@ -165,9 +165,8 @@ app.MapGet("/rating", () =>
         {
             s.PlayerName,
             s.Score,
-            //s.TimeSeconds,
-            //s.TimeFormatted,
-            time = $"{s.TimeSeconds / 60:D2}:{s.TimeSeconds % 60:D2}",
+            s.TimeSeconds,
+            TimeFormatted = $"{s.TimeSeconds / 60:D2}:{s.TimeSeconds % 60:D2}",
             s.Difficulty,
             s.Date
         }));
