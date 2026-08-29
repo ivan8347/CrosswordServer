@@ -13,20 +13,16 @@ namespace CrosswordServer.Models
     }
 
     /// Информация об игроке в конкретной игре.
-    public class GamePlayer
-    {
-        /// Имя игрока (то самое, которое ребёнок вводит в игре один раз).
-        public string PlayerName { get; set; } = string.Empty;
-        /// Набранные очки (можно заполнять позже, когда игрок закончит игру).
-        public int Score { get; set; }
-        /// Время прохождения в секундах (тоже можно заполнить позже).
-        public int TimeSeconds { get; set; }
-        public bool IsSubmitted { get; set; } = false;
-        public bool HasReported { get; set; }
-        public string TimeFormatted => TimeSpan.FromSeconds(TimeSeconds).ToString(@"mm\:ss");
+        //public class GamePlayer
+        //{
+        //    public string PlayerName { get; set; } = "";
+        //    public int Score { get; set; }
+        //    public int TimeSeconds { get; set; }
+        //    public bool HasReported { get; set; }
 
+        //    public string TimeFormatted => TimeSpan.FromSeconds(TimeSeconds).ToString(@"mm\:ss");
+        //}
 
-    }
 
     /// Основная модель игры, которая будет храниться на сервере.
     public class GameInfo

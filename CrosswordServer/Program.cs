@@ -3,17 +3,14 @@ using CrosswordServer.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ОБЯЗАТЕЛЬНО ДЛЯ RENDER
 builder.Host.ConfigureHostOptions(options =>
 {
     //options.DisableFileSystemWatcher = true;
 });
 
-// Минимальные эндпоинты — без контроллеров
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Хранилище игр
 builder.Services.AddSingleton<GameStorage>();
 
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5270";
@@ -25,37 +22,29 @@ builder.WebHost.ConfigureKestrel(options =>
 
 var app = builder.Build();
 
-// Swagger только в Development
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-// Маршрут проверки
 app.MapGet("/", () => "Server is running!");
 
-// Хранилище
 var storage = app.Services.GetRequiredService<GameStorage>();
 
-// ⭐ ЗАГРУЗКА ГЛОБАЛЬНОГО РЕЙТИНГА
 storage.LoadGlobalScores();
 Console.WriteLine("[SERVER] Global rating loaded.");
-
-// ==========================
-// ЭНДПОИНТЫ
-// ==========================
 
 app.MapGet("/games", () =>
 {
     var games = storage.GetAllGames();
     return Results.Ok(games.Select(g => new
     {
-        gameId = g.GameId,
-        creator = g.CreatorName,
+        g.GameId,
+        g.CreatorName,
         players = g.Players.Select(p => p.PlayerName),
         status = g.Status.ToString(),
-        difficulty = g.Difficulty
+        g.Difficulty
     }));
 });
 
@@ -64,10 +53,10 @@ app.MapPost("/game/create", (CreateGameRequest req) =>
     var game = storage.CreateGame(req.CreatorName, req.Difficulty);
     return Results.Ok(new
     {
-        gameId = game.GameId,
-        seed = game.Seed,
-        creator = game.CreatorName,
-        difficulty = game.Difficulty,
+        game.GameId,
+        game.Seed,
+        game.CreatorName,
+        game.Difficulty,
         status = game.Status.ToString()
     });
 });
@@ -81,29 +70,13 @@ app.MapPost("/game/join", (JoinGameRequest req) =>
     var g = storage.GetGame(req.GameId)!;
     return Results.Ok(new
     {
-        gameId = g.GameId,
-        seed = g.Seed,
-        creator = g.CreatorName,
-        players = g.Players.Select(p => p.PlayerName).ToList(),
+        g.GameId,
+        g.Seed,
+        g.CreatorName,
+        players = g.Players.Select(p => p.PlayerName),
         status = g.Status.ToString()
     });
 });
-
-app.MapGet("/game/status/{id}", (string id) =>
-{
-    var game = storage.GetGame(id);
-    if (game == null)
-        return Results.NotFound("Игра не найдена");
-
-    return Results.Ok(new
-    {
-        isCompleted = (game.Status == GameStatus.Finished)
-    });
-});
-
-// ==========================
-// ОТПРАВКА РЕЗУЛЬТАТА
-// ==========================
 
 app.MapPost("/game/result", (ResultRequest req) =>
 {
@@ -116,23 +89,9 @@ app.MapPost("/game/result", (ResultRequest req) =>
     if (g == null)
         return Results.Ok(new { deleted = true });
 
-    // ⭐ Добавляем в глобальный рейтинг
-    storage.GlobalScores.Add(new GameStorage.ScoreRecord
-    {
-        PlayerName = req.PlayerName,
-        Score = req.Score,
-        TimeSeconds = req.Time,
-        Difficulty = g.Difficulty,
-        Date = DateTime.UtcNow
-    });
-
-    // ⭐ Сохраняем рейтинг
-    storage.SaveGlobalScores();
-
-    // ⭐ Проверяем завершение всех игроков
     bool allPlayersReported = g.Players.All(p => p.HasReported);
 
-    if (allPlayersReported && g.Status != GameStatus.Finished)
+    if (allPlayersReported)
     {
         g.Status = GameStatus.Finished;
         storage.DeleteGame(req.GameId);
@@ -144,33 +103,14 @@ app.MapPost("/game/result", (ResultRequest req) =>
         status = g.Status.ToString(),
         players = g.Players.Select(p => new
         {
-            name = p.PlayerName,
-            score = p.Score,
-            time = p.TimeSeconds,
-            timeFormatted = p.TimeFormatted
-        }).ToList()
+            p.PlayerName,
+            p.Score,
+            p.TimeSeconds,
+            p.TimeFormatted
+        })
     });
 });
 
-// ==========================
-// ГЛОБАЛЬНЫЙ РЕЙТИНГ
-// ==========================
-
-//app.MapGet("/rating", () =>
-//{
-//    return Results.Ok(storage.GlobalScores
-//        .OrderByDescending(s => s.Score)
-//        .ThenBy(s => s.TimeSeconds)
-//        .Select(s => new
-//        {
-//            s.PlayerName,
-//            s.Score,
-//            s.TimeSeconds,
-//            s.TimeFormatted,
-//            s.Difficulty,
-//            s.Date
-//        }));
-//});
 app.MapGet("/rating", () =>
 {
     return Results.Ok(storage.GlobalScores
@@ -178,49 +118,14 @@ app.MapGet("/rating", () =>
         .ThenBy(s => s.TimeSeconds)
         .Select(s => new
         {
-            playerName = s.PlayerName,
-            score = s.Score,
-            timeSeconds = s.TimeSeconds,
-            timeFormatted = s.TimeFormatted,
-            difficulty = s.Difficulty,
-            date = s.Date
+            s.PlayerName,
+            s.Score,
+            s.TimeSeconds,
+            s.TimeFormatted,
+            s.Difficulty,
+            s.Date
         }));
 });
-
-
-// ==========================
-// РЕЗУЛЬТАТЫ ИГРЫ
-// ==========================
-
-app.MapGet("/results/{id}", (string id) =>
-{
-    var game = storage.GetGame(id);
-    if (game == null)
-        return Results.NotFound("Игра не найдена");
-
-    var results = game.Players
-        .OrderByDescending(p => p.Score)
-        .ThenBy(p => p.TimeSeconds)
-        .Select(p => new
-        {
-            playerName = p.PlayerName,
-            score = p.Score,
-            timeSeconds = p.TimeSeconds,
-            timeFormatted = p.TimeFormatted
-        })
-        .ToList();
-
-    game.ResultsRequestsCount++;
-
-    if (game.ResultsRequestsCount >= game.Players.Count)
-        storage.DeleteGame(id);
-
-    return Results.Ok(results);
-});
-
-// ==========================
-// ЧАТ
-// ==========================
 
 app.MapPost("/chat", (ChatMessage msg) =>
 {
@@ -233,10 +138,6 @@ app.MapGet("/chat", () =>
 {
     return Results.Ok(storage.GlobalChat.OrderBy(m => m.Time));
 });
-
-// ==========================
-// PING
-// ==========================
 
 app.MapGet("/ping", () => Results.Ok("pong"));
 
