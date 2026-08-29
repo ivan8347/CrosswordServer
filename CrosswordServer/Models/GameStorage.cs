@@ -1,35 +1,102 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
+using Newtonsoft.Json;
 using CrosswordServer.Models;
+//using System.Xml;
 
 namespace CrosswordServer.Storage
 {
     public class GameStorage
     {
+        // -----------------------------
+        // Модель записи рейтинга
+        // -----------------------------
         public class ScoreRecord
         {
-            public string PlayerName { get; set; }
+            public string PlayerName { get; set; } = "";
             public int Score { get; set; }
             public int TimeSeconds { get; set; }
-            public string Difficulty { get; set; }
+            public string Difficulty { get; set; } = "";
             public DateTime Date { get; set; }
+
             public string TimeFormatted => TimeSpan.FromSeconds(TimeSeconds).ToString(@"mm\:ss");
-
-
         }
-        // Все активные игры.
-        // Ключ — GameId (например "123456").
-        // Значение — GameInfo.
+
+        public void SaveGlobalScores()
+        {
+            try
+            {
+                string json = JsonConvert.SerializeObject(GlobalScores, Newtonsoft.Json.Formatting.Indented);
+                File.WriteAllText(RatingFile, json);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[SERVER] Ошибка сохранения рейтинга: " + ex.Message);
+            }
+        }
+
+
+        // -----------------------------
+        // Путь к файлу глобального рейтинга
+        // -----------------------------
+        private static string RatingFile =>
+            Path.Combine(AppContext.BaseDirectory, "global_scores.json");
+
+        // -----------------------------
+        // Глобальный рейтинг
+        // -----------------------------
+        public List<ScoreRecord> GlobalScores { get; set; } = new();
+
+        // -----------------------------
+        // Загрузка рейтинга при старте
+        // -----------------------------
+        public void LoadGlobalScores()
+        {
+            if (!File.Exists(RatingFile))
+            {
+                GlobalScores = new List<ScoreRecord>();
+                return;
+            }
+
+            try
+            {
+                string json = File.ReadAllText(RatingFile);
+                GlobalScores = JsonConvert.DeserializeObject<List<ScoreRecord>>(json)
+                               ?? new List<ScoreRecord>();
+            }
+            catch
+            {
+                GlobalScores = new List<ScoreRecord>();
+            }
+        }
+
+        // -----------------------------
+        // Сохранение рейтинга
+        // -----------------------------
+        //public void SaveGlobalScores()
+        //{
+        //    try
+        //    {
+        //        string json = JsonConvert.SerializeObject(GlobalScores, Formatting.Indented);
+        //        File.WriteAllText(RatingFile, json);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Console.WriteLine("[SERVER] Ошибка сохранения рейтинга: " + ex.Message);
+        //    }
+        //}
+
+        // -----------------------------
+        // Хранилище игр
+        // -----------------------------
         private readonly Dictionary<string, GameInfo> _games = new();
 
-        // Создать новую игру.
+        // Создать новую игру
         public GameInfo CreateGame(string creatorName, string difficulty)
         {
-            // Генерируем короткий ID игры (6 цифр).
             string id = new Random().Next(100000, 999999).ToString();
-
-            // Генерируем seed для одинакового кроссворда.
             int seed = Random.Shared.Next(1, 999999);
 
             var game = new GameInfo
@@ -39,56 +106,43 @@ namespace CrosswordServer.Storage
                 Difficulty = difficulty,
                 Seed = seed,
                 Status = GameStatus.Waiting,
+                StartTime = DateTime.UtcNow
             };
-            // Создатель автоматически становится первым игроком.
-            game.Players.Add(new GamePlayer
-            {
-                PlayerName = creatorName
-            });
-            game.StartTime = DateTime.UtcNow;
+
+            game.Players.Add(new GamePlayer { PlayerName = creatorName });
 
             _games[id] = game;
             return game;
         }
 
-        // Получить список всех активных игр.
-        // Завершённые игры сюда не попадают, потому что мы их удаляем.
-        public List<GameInfo> GetAllGames()
-        {
-            return _games.Values.ToList();
-        }
+        // Получить список всех активных игр
+        public List<GameInfo> GetAllGames() => _games.Values.ToList();
 
-        // Получить игру по ID.
+        // Получить игру по ID
         public GameInfo? GetGame(string id)
         {
             _games.TryGetValue(id, out var game);
             return game;
         }
 
-        // Подключить игрока к игре.
+        // Подключить игрока
         public bool JoinGame(string id, string playerName)
         {
             if (!_games.TryGetValue(id, out var game))
                 return false;
 
-            // Если игрок уже есть — ничего не делаем.
             if (game.Players.Any(p => p.PlayerName == playerName))
                 return true;
 
-            game.Players.Add(new GamePlayer
-            {
-                PlayerName = playerName
-            });
+            game.Players.Add(new GamePlayer { PlayerName = playerName });
 
-            // Если игроков стало больше одного — считаем, что игра идёт.
             if (game.Players.Count >= 1)
                 game.Status = GameStatus.Running;
 
             return true;
         }
 
-        // Игрок отправляет результат.
-        // После того как все игроки отправили результат — игра удаляется.
+        // Игрок отправляет результат
         public bool SubmitResult(string id, string playerName, int score, int time)
         {
             if (!_games.TryGetValue(id, out var game))
@@ -102,47 +156,52 @@ namespace CrosswordServer.Storage
             player.TimeSeconds = time;
             player.HasReported = true;
 
-            // Логируем отправку результата
             Console.WriteLine($"[SERVER] Игрок {playerName} отправил результат: Score={score}, Time={time}");
 
-            // Проверяем завершение всех игроков
             bool allFinished = game.Players.All(p => p.Score != 0 || p.TimeSeconds != 0);
 
-            int finishedCount = game.Players.Count(p => p.Score != 0 || p.TimeSeconds != 0);
-
-            Console.WriteLine($"[SERVER] Игра {id}: завершили {finishedCount} из {game.Players.Count}");
-
-            // Удаляем игру только когда ВСЕ присоединившиеся игроки завершили
             if (allFinished)
             {
-                Console.WriteLine($"[SERVER] Игра {id} удалена. Все игроки завершили.");
+                Console.WriteLine($"[SERVER] Игра {id} завершена.");
                 game.Status = GameStatus.Finished;
-                //_games.Remove(id);
             }
+
+            // -----------------------------
+            // Добавляем в глобальный рейтинг
+            // -----------------------------
+            GlobalScores.Add(new ScoreRecord
+            {
+                PlayerName = playerName,
+                Score = score,
+                TimeSeconds = time,
+                Difficulty = game.Difficulty,
+                Date = DateTime.UtcNow
+            });
+
+            SaveGlobalScores();
 
             return true;
         }
 
+        // Удалить игру
         public void DeleteGame(string id)
         {
             _games.Remove(id);
         }
 
+        // Получить результаты игры
         public List<GamePlayer>? GetResults(string id)
         {
             if (!_games.TryGetValue(id, out var game))
                 return null;
 
-            // уже отсортированные по очкам, потом по времени
             return game.Players
                 .OrderByDescending(p => p.Score)
                 .ThenBy(p => p.TimeSeconds)
                 .ToList();
         }
+
+        // Глобальный чат
         public List<ChatMessage> GlobalChat { get; set; } = new();
-        public List<ScoreRecord> GlobalScores { get; set; } = new();
-
     }
-
-
 }

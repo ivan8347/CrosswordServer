@@ -38,6 +38,10 @@ app.MapGet("/", () => "Server is running!");
 // Хранилище
 var storage = app.Services.GetRequiredService<GameStorage>();
 
+// ⭐ ЗАГРУЗКА ГЛОБАЛЬНОГО РЕЙТИНГА
+storage.LoadGlobalScores();
+Console.WriteLine("[SERVER] Global rating loaded.");
+
 // ==========================
 // ЭНДПОИНТЫ
 // ==========================
@@ -97,36 +101,10 @@ app.MapGet("/game/status/{id}", (string id) =>
     });
 });
 
-/*app.MapPost("/game/result", (ResultRequest req) =>
-{
-    var ok = storage.SubmitResult(req.GameId, req.PlayerName, req.Score, req.Time);
-    if (!ok)
-        return Results.NotFound("Игра не найдена или игрок отсутствует");
+// ==========================
+// ОТПРАВКА РЕЗУЛЬТАТА
+// ==========================
 
-    var g = storage.GetGame(req.GameId);
-    if (g == null)
-        return Results.Ok(new { deleted = true });
-
-    bool allPlayersReported = g.Players.All(p => p.Score > 1 || p.TimeSeconds > 1);
-
-    if (allPlayersReported && g.Status != GameStatus.Finished)
-    {
-        g.Status = GameStatus.Finished;
-        storage.DeleteGame(req.GameId);
-    }
-
-    return Results.Ok(new
-    {
-        deleted = false,
-        status = g.Status.ToString(),
-        players = g.Players.Select(p => new
-        {
-            name = p.PlayerName,
-            score = p.Score,
-            time = p.TimeSeconds
-        }).ToList()
-    });
-});*/
 app.MapPost("/game/result", (ResultRequest req) =>
 {
     var ok = storage.SubmitResult(req.GameId, req.PlayerName, req.Score, req.Time);
@@ -134,9 +112,11 @@ app.MapPost("/game/result", (ResultRequest req) =>
         return Results.NotFound("Игра не найдена или игрок отсутствует");
 
     var g = storage.GetGame(req.GameId);
+
     if (g == null)
         return Results.Ok(new { deleted = true });
 
+    // ⭐ Добавляем в глобальный рейтинг
     storage.GlobalScores.Add(new GameStorage.ScoreRecord
     {
         PlayerName = req.PlayerName,
@@ -146,9 +126,10 @@ app.MapPost("/game/result", (ResultRequest req) =>
         Date = DateTime.UtcNow
     });
 
+    // ⭐ Сохраняем рейтинг
+    storage.SaveGlobalScores();
 
-
-    // ⭐ Правильная проверка
+    // ⭐ Проверяем завершение всех игроков
     bool allPlayersReported = g.Players.All(p => p.HasReported);
 
     if (allPlayersReported && g.Status != GameStatus.Finished)
@@ -165,18 +146,35 @@ app.MapPost("/game/result", (ResultRequest req) =>
         {
             name = p.PlayerName,
             score = p.Score,
-            time = p.TimeSeconds
+            time = p.TimeSeconds,
+            timeFormatted = p.TimeFormatted
         }).ToList()
     });
-    
-
 });
+
+// ==========================
+// ГЛОБАЛЬНЫЙ РЕЙТИНГ
+// ==========================
+
 app.MapGet("/rating", () =>
 {
     return Results.Ok(storage.GlobalScores
         .OrderByDescending(s => s.Score)
-        .ThenBy(s => s.TimeSeconds));
+        .ThenBy(s => s.TimeSeconds)
+        .Select(s => new
+        {
+            s.PlayerName,
+            s.Score,
+            s.TimeSeconds,
+            s.TimeFormatted,
+            s.Difficulty,
+            s.Date
+        }));
 });
+
+// ==========================
+// РЕЗУЛЬТАТЫ ИГРЫ
+// ==========================
 
 app.MapGet("/results/{id}", (string id) =>
 {
@@ -191,7 +189,8 @@ app.MapGet("/results/{id}", (string id) =>
         {
             playerName = p.PlayerName,
             score = p.Score,
-            timeSeconds = p.TimeSeconds
+            timeSeconds = p.TimeSeconds,
+            timeFormatted = p.TimeFormatted
         })
         .ToList();
 
@@ -202,6 +201,10 @@ app.MapGet("/results/{id}", (string id) =>
 
     return Results.Ok(results);
 });
+
+// ==========================
+// ЧАТ
+// ==========================
 
 app.MapPost("/chat", (ChatMessage msg) =>
 {
@@ -215,6 +218,9 @@ app.MapGet("/chat", () =>
     return Results.Ok(storage.GlobalChat.OrderBy(m => m.Time));
 });
 
+// ==========================
+// PING
+// ==========================
 
 app.MapGet("/ping", () => Results.Ok("pong"));
 

@@ -23,6 +23,8 @@ namespace CrosswordServer.Models
         public int TimeSeconds { get; set; }
         public bool IsSubmitted { get; set; } = false;
         public bool HasReported { get; set; }
+        public string TimeFormatted => TimeSpan.FromSeconds(TimeSeconds).ToString(@"mm\:ss");
+
 
     }
 
