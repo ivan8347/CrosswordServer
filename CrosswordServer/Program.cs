@@ -156,6 +156,21 @@ app.MapPost("/game/result", (ResultRequest req) =>
 // ГЛОБАЛЬНЫЙ РЕЙТИНГ
 // ==========================
 
+//app.MapGet("/rating", () =>
+//{
+//    return Results.Ok(storage.GlobalScores
+//        .OrderByDescending(s => s.Score)
+//        .ThenBy(s => s.TimeSeconds)
+//        .Select(s => new
+//        {
+//            s.PlayerName,
+//            s.Score,
+//            s.TimeSeconds,
+//            s.TimeFormatted,
+//            s.Difficulty,
+//            s.Date
+//        }));
+//});
 app.MapGet("/rating", () =>
 {
     return Results.Ok(storage.GlobalScores
@@ -163,14 +178,15 @@ app.MapGet("/rating", () =>
         .ThenBy(s => s.TimeSeconds)
         .Select(s => new
         {
-            s.PlayerName,
-            s.Score,
-            s.TimeSeconds,
-            s.TimeFormatted,
-            s.Difficulty,
-            s.Date
+            playerName = s.PlayerName,
+            score = s.Score,
+            timeSeconds = s.TimeSeconds,
+            timeFormatted = s.TimeFormatted,
+            difficulty = s.Difficulty,
+            date = s.Date
         }));
 });
+
 
 // ==========================
 // РЕЗУЛЬТАТЫ ИГРЫ
