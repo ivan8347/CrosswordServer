@@ -8,6 +8,9 @@ namespace CrosswordServer.Storage
 {
     public class GameStorage
     {
+        // -----------------------------
+        // Глобальный рейтинг
+        // -----------------------------
         public class ScoreRecord
         {
             public string PlayerName { get; set; } = "";
@@ -16,69 +19,30 @@ namespace CrosswordServer.Storage
             public string Difficulty { get; set; } = "";
             public DateTime Date { get; set; }
 
-            // Форматирование времени прямо в модели
             public string TimeFormatted =>
                 $"{TimeSeconds / 60:D2}:{TimeSeconds % 60:D2}";
         }
 
         private readonly Dictionary<string, GameInfo> _games = new();
-        private readonly object _lock = new(); // Для потокобезопасности
-        private static readonly Random _idGenerator = new Random(); // Для уникальных ID
+        private readonly object _lock = new();
 
-        // Глобальный рейтинг (в памяти)
         public List<ScoreRecord> GlobalScores { get; set; } = new();
 
-        // Методы для работы с файлом (оставлены, но не используются в текущей логике)
-        private static string RatingFile =>
-            System.IO.Path.Combine(AppContext.BaseDirectory, "global_scores.json");
-
-        public void LoadGlobalScores()
-        {
-            // На Render это не будет работать корректно, поэтому лучше не вызывать
-            if (!System.IO.File.Exists(RatingFile))
-            {
-                GlobalScores = new List<ScoreRecord>();
-                return;
-            }
-
-            try
-            {
-                string json = System.IO.File.ReadAllText(RatingFile);
-                GlobalScores = JsonConvert.DeserializeObject<List<ScoreRecord>>(json)
-                               ?? new List<ScoreRecord>();
-            }
-            catch
-            {
-                GlobalScores = new List<ScoreRecord>();
-            }
-        }
-
-        public void SaveGlobalScores()
-        {
-            // На Render запись в файл не сработает, поэтому этот метод лучше не вызывать
-            try
-            {
-                string json = JsonConvert.SerializeObject(GlobalScores, Newtonsoft.Json.Formatting.Indented);
-                System.IO.File.WriteAllText(RatingFile, json);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("[SERVER] Ошибка сохранения рейтинга: " + ex.Message);
-            }
-        }
-
+        // -----------------------------
+        // Создание игры — сложность задаёт ТОЛЬКО создатель
+        // -----------------------------
         public GameInfo CreateGame(string creatorName, string difficulty)
         {
             lock (_lock)
             {
-                string id = _idGenerator.Next(100000, 999999).ToString();
+                string id = new Random().Next(100000, 999999).ToString();
                 int seed = Random.Shared.Next(1, 999999);
 
                 var game = new GameInfo
                 {
                     GameId = id,
                     CreatorName = creatorName,
-                    Difficulty = difficulty,
+                    Difficulty = difficulty,   // ← ВАЖНО: сложность задаётся здесь
                     Seed = seed,
                     Status = GameStatus.Waiting,
                     StartTime = DateTime.UtcNow
@@ -91,6 +55,9 @@ namespace CrosswordServer.Storage
             }
         }
 
+        // -----------------------------
+        // Получение списка игр
+        // -----------------------------
         public List<GameInfo> GetAllGames()
         {
             lock (_lock)
@@ -99,6 +66,9 @@ namespace CrosswordServer.Storage
             }
         }
 
+        // -----------------------------
+        // Получение игры по ID
+        // -----------------------------
         public GameInfo? GetGame(string id)
         {
             lock (_lock)
@@ -108,6 +78,10 @@ namespace CrosswordServer.Storage
             }
         }
 
+        // -----------------------------
+        // Подключение игрока
+        // Сложность НЕ меняется!
+        // -----------------------------
         public bool JoinGame(string id, string playerName)
         {
             lock (_lock)
@@ -120,7 +94,6 @@ namespace CrosswordServer.Storage
 
                 game.Players.Add(new GamePlayer { PlayerName = playerName });
 
-                // ✅ Игра стартует, когда есть минимум 2 игрока
                 if (game.Players.Count >= 2)
                     game.Status = GameStatus.Running;
 
@@ -128,6 +101,9 @@ namespace CrosswordServer.Storage
             }
         }
 
+        // -----------------------------
+        // Отправка результата
+        // -----------------------------
         public bool SubmitResult(string id, string playerName, int score, int time)
         {
             lock (_lock)
@@ -145,23 +121,21 @@ namespace CrosswordServer.Storage
 
                 Console.WriteLine($"[SERVER] Игрок {playerName} отправил результат: Score={score}, Time={time}");
 
-                // ✅ Проверка по флагу HasReported
                 bool allFinished = game.Players.All(p => p.HasReported);
 
                 if (allFinished)
                 {
                     Console.WriteLine($"[SERVER] Игра {id} завершена.");
                     game.Status = GameStatus.Finished;
-                    // Удаление игры лучше делать в Program.cs
                 }
-
-                // ❌ УДАЛЕНО: добавление в GlobalScores и SaveGlobalScores
-                // Они будут добавлены в Program.cs в эндпоинте /game/result
 
                 return true;
             }
         }
 
+        // -----------------------------
+        // Удаление игры
+        // -----------------------------
         public void DeleteGame(string id)
         {
             lock (_lock)
@@ -170,6 +144,9 @@ namespace CrosswordServer.Storage
             }
         }
 
+        // -----------------------------
+        // Получение результатов игры
+        // -----------------------------
         public List<GamePlayer>? GetResults(string id)
         {
             lock (_lock)
@@ -184,6 +161,9 @@ namespace CrosswordServer.Storage
             }
         }
 
+        // -----------------------------
+        // Глобальный чат
+        // -----------------------------
         public List<ChatMessage> GlobalChat { get; set; } = new();
     }
 }

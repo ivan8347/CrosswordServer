@@ -38,10 +38,6 @@ app.MapGet("/", () => "Server is running!");
 // Хранилище
 var storage = app.Services.GetRequiredService<GameStorage>();
 
-// ⭐ ЗАГРУЗКА ГЛОБАЛЬНОГО РЕЙТИНГА
-//storage.LoadGlobalScores();
-//Console.WriteLine("[SERVER] Global rating loaded.");
-
 // ==========================
 // ЭНДПОИНТЫ
 // ==========================
@@ -84,6 +80,7 @@ app.MapPost("/game/join", (JoinGameRequest req) =>
         gameId = g.GameId,
         seed = g.Seed,
         creator = g.CreatorName,
+        difficulty = g.Difficulty,   // ⭐ ДОБАВЛЕНО
         players = g.Players.Select(p => p.PlayerName).ToList(),
         status = g.Status.ToString()
     });
@@ -116,7 +113,6 @@ app.MapPost("/game/result", (ResultRequest req) =>
     if (g == null)
         return Results.Ok(new { deleted = true });
 
-    // ⭐ Добавляем в глобальный рейтинг
     storage.GlobalScores.Add(new GameStorage.ScoreRecord
     {
         PlayerName = req.PlayerName,
@@ -126,10 +122,6 @@ app.MapPost("/game/result", (ResultRequest req) =>
         Date = DateTime.UtcNow
     });
 
-    // ⭐ Сохраняем рейтинг
-    //storage.SaveGlobalScores();
-
-    // ⭐ Проверяем завершение всех игроков
     bool allPlayersReported = g.Players.All(p => p.HasReported);
 
     if (allPlayersReported && g.Status != GameStatus.Finished)
