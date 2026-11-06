@@ -198,17 +198,59 @@ app.MapGet("/results/{id}", (string id) =>
 // ЧАТ
 // ==========================
 
+//app.MapPost("/chat", (ChatMessage msg) =>
+//{
+//    msg.Time = DateTime.UtcNow;
+//    storage.GlobalChat.Add(msg);
+//    return Results.Ok();
+//});
+
+//app.MapGet("/chat", () =>
+//{
+//    return Results.Ok(storage.GlobalChat.OrderBy(m => m.Time));
+//});
+
+// ==========================
+// ЧАТ
+// ==========================
+
 app.MapPost("/chat", (ChatMessage msg) =>
 {
     msg.Time = DateTime.UtcNow;
+
+    // Чистим ник от пробелов, чтобы "@Вася" и "Вася " совпадали
+    msg.Recipient = string.IsNullOrWhiteSpace(msg.Recipient) ? null : msg.Recipient.Trim();
+
     storage.GlobalChat.Add(msg);
+
+    // Не даём чату расти бесконечно — память на Render ограничена
+    if (storage.GlobalChat.Count > 200)
+        storage.GlobalChat.RemoveRange(0, storage.GlobalChat.Count - 200);
+
     return Results.Ok();
 });
 
-app.MapGet("/chat", () =>
+app.MapGet("/chat", (string? player) =>
 {
-    return Results.Ok(storage.GlobalChat.OrderBy(m => m.Time));
+    IEnumerable<ChatMessage> visible;
+
+    if (string.IsNullOrWhiteSpace(player))
+    {
+        // Без имени — отдаём только общие сообщения (для совместимости)
+        visible = storage.GlobalChat.Where(m => string.IsNullOrEmpty(m.Recipient));
+    }
+    else
+    {
+        // Фильтрация: общие + личные этому игроку + его собственные
+        visible = storage.GlobalChat.Where(m =>
+            string.IsNullOrEmpty(m.Recipient) ||
+            string.Equals(m.Recipient, player, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(m.Player, player, StringComparison.OrdinalIgnoreCase));
+    }
+
+    return Results.Ok(visible.OrderBy(m => m.Time));
 });
+
 
 // ==========================
 // PING
