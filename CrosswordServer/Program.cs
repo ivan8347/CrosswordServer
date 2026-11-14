@@ -4,10 +4,10 @@ using CrosswordServer.Models;
 var builder = WebApplication.CreateBuilder(args);
 
 // ОБЯЗАТЕЛЬНО ДЛЯ RENDER
-builder.Host.ConfigureHostOptions(options =>
-{
-    //options.DisableFileSystemWatcher = true;
-});
+//builder.Host.ConfigureHostOptions(options =>
+//{
+//    //options.DisableFileSystemWatcher = true;
+//});
 
 // Минимальные эндпоинты — без контроллеров
 builder.Services.AddEndpointsApiExplorer();
