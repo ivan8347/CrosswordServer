@@ -12,6 +12,8 @@ var builder = WebApplication.CreateBuilder(args);
 // Минимальные эндпоинты — без контроллеров
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+//builder.Services.AddHealthChecks();
+
 
 // Хранилище игр
 builder.Services.AddSingleton<GameStorage>();
@@ -24,6 +26,11 @@ builder.WebHost.ConfigureKestrel(options =>
 });
 
 var app = builder.Build();
+// Добавляем стандартный Health Check
+//app.MapHealthChecks("/health");
+app.MapGet("/health", () => Results.Ok("Healthy"));
+
+
 
 // Swagger только в Development
 if (app.Environment.IsDevelopment())
