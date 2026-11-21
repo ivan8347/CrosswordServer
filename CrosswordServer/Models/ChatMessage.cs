@@ -7,6 +7,7 @@
         public string Text { get; set; } = "";
         public DateTime Time { get; set; }
         public string? Recipient { get; set; }
+        public string Id { get; set; }
 
     }
 }
