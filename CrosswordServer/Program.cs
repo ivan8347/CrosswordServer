@@ -221,36 +221,36 @@ app.MapGet("/results/{id}", (string id) =>
 // ЧАТ
 // ==========================
 
-app.MapPost("/chat", (ChatMessage msg) =>
-{
-    msg.Time = DateTime.UtcNow;
-    msg.Id = Guid.NewGuid().ToString("N");
-
-    msg.Recipient = string.IsNullOrWhiteSpace(msg.Recipient) ? null : msg.Recipient.Trim();
-
-    storage.GlobalChat.Add(msg);
-
-    if (storage.GlobalChat.Count > 200)
-        storage.GlobalChat.RemoveRange(0, storage.GlobalChat.Count - 200);
-
-    return Results.Ok();
-});
-
 //app.MapPost("/chat", (ChatMessage msg) =>
 //{
 //    msg.Time = DateTime.UtcNow;
+//    msg.Id = Guid.NewGuid().ToString("N");
 
-//    // Чистим ник от пробелов, чтобы "@Вася" и "Вася " совпадали
 //    msg.Recipient = string.IsNullOrWhiteSpace(msg.Recipient) ? null : msg.Recipient.Trim();
 
 //    storage.GlobalChat.Add(msg);
 
-//    // Не даём чату расти бесконечно — память на Render ограничена
 //    if (storage.GlobalChat.Count > 200)
 //        storage.GlobalChat.RemoveRange(0, storage.GlobalChat.Count - 200);
 
 //    return Results.Ok();
 //});
+
+app.MapPost("/chat", (ChatMessage msg) =>
+{
+    msg.Time = DateTime.UtcNow;
+
+    // Чистим ник от пробелов, чтобы "@Вася" и "Вася " совпадали
+    msg.Recipient = string.IsNullOrWhiteSpace(msg.Recipient) ? null : msg.Recipient.Trim();
+
+    storage.GlobalChat.Add(msg);
+
+    // Не даём чату расти бесконечно — память на Render ограничена
+    if (storage.GlobalChat.Count > 200)
+        storage.GlobalChat.RemoveRange(0, storage.GlobalChat.Count - 200);
+
+    return Results.Ok();
+});
 
 app.MapGet("/chat", (string? player) =>
 {
